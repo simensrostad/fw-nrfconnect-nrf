@@ -17,27 +17,31 @@ config DATA_THREAD_STACK_SIZE
 
 config GPS_BUFFER_MAX
 	int "GPS data ringbuffer entries"
-	default 10
+	default 20
 
 config SENSOR_BUFFER_MAX
 	int "Sensor data ringbuffer entries"
-	default 10
+	default 20
 
 config MODEM_BUFFER_DYNAMIC_MAX
 	int "Dynamic modem data ringbuffer entries"
-	default 10
+	default 1
+
+config MODEM_BUFFER_STATIC_MAX
+	int "Static modem data ringbuffer entries"
+	default 1
 
 config UI_BUFFER_MAX
 	int "UI data ringbuffer entries"
-	default 10
+	default 1
 
 config ACCEL_BUFFER_MAX
 	int "Accelerometer data ringbuffer entries"
-	default 10
+	default 1
 
-config BAT_BUFFER_MAX
+config BATTERY_BUFFER_MAX
 	int "Battery data ringbuffer entries"
-	default 10
+	default 1
 
 endif # DATA_MODULE
 
