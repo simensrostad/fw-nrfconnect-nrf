@@ -52,6 +52,9 @@ int module_enqueue_msg(struct module_data *module, void *msg)
 		return err;
 	}
 
+	uint32_t num_entries = k_msgq_num_used_get(module->msg_q);
+	LOG_WRN("%s: contains %d entries", log_strdup(module->name), num_entries);
+
 	if (IS_ENABLED(CONFIG_MODULES_COMMON_LOG_LEVEL_DBG)) {
 		struct event_prototype *evt_proto =
 			(struct event_prototype *)msg;
