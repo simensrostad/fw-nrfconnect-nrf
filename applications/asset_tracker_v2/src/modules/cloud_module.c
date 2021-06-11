@@ -10,6 +10,7 @@
 #include <dfu/mcuboot.h>
 #include <math.h>
 #include <event_manager.h>
+#include <cJSON.h>
 
 #if defined(CONFIG_NRF_CLOUD_AGPS)
 #include <net/nrf_cloud_agps.h>
@@ -87,6 +88,16 @@ const k_tid_t cloud_module_thread;
 /* Local copy of the last requested AGPS request from the modem. */
 static struct gps_agps_request agps_request;
 
+/* Expected message formats received from cloud. Used to filter incoming
+ * messages.
+ */
+enum message_format {
+	UNKNOWN,
+	AGPS_BINARY,
+	JSON_CONFIG,
+	JSON_PGPS
+};
+
 /* Cloud module message queue. */
 #define CLOUD_QUEUE_ENTRY_COUNT		10
 #define CLOUD_QUEUE_BYTE_ALIGNMENT	4
@@ -103,6 +114,7 @@ static struct module_data self = {
 /* Forward declarations. */
 static void connect_check_work_fn(struct k_work *work);
 static void send_config_received(void);
+static enum message_format determine_message_format(uint8_t *buf, size_t len);
 
 /* Convenience functions used in internal state handling. */
 static char *state2str(enum state_type state)
@@ -219,46 +231,6 @@ static bool event_handler(const struct event_header *eh)
 	return false;
 }
 
-static void agps_data_handle(const uint8_t *buf, size_t len)
-{
-	int err;
-
-#if defined(CONFIG_AGPS)
-	err = gps_process_agps_data(buf, len);
-	if (err) {
-		LOG_WRN("Unable to process agps data, error: %d", err);
-#if defined(CONFIG_NRF_CLOUD_PGPS)
-		LOG_WRN("Proceed to process data if PGPS related");
-		err = nrf_cloud_pgps_process(buf, len);
-		if (err) {
-			LOG_ERR("Error processing PGPS packet: %d", err);
-		}
-		return;
-#endif
-	}
-
-#if defined(CONFIG_NRF_CLOUD_PGPS)
-	/* Notify PGPS handler when PGPS is ready. */
-	err = nrf_cloud_pgps_notify_prediction();
-	if (err) {
-		LOG_ERR("error requesting notification of prediction availability: %d", err);
-	}
-
-	return;
-
-#endif
-#endif
-
-#if defined(CONFIG_NRF_CLOUD_PGPS)
-	err = nrf_cloud_pgps_process(buf, len);
-	if (err) {
-		LOG_ERR("Error processing PGPS packet: %d", err);
-	}
-#endif
-
-	(void)err;
-}
-
 static void agps_data_request_handle(struct gps_agps_request *incoming_request)
 {
 	int err;
@@ -320,34 +292,61 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 
 		int err;
 
-		/* Use the config copy when populating the config variable
-		 * before it is sent to the Data module. This way we avoid
-		 * sending uninitialized variables to the Data module.
+		/* Filter incoming message to the correct data handling function based on
+		 * the message format.
 		 */
-		err = cloud_codec_decode_config(evt->data.buf, &copy_cfg);
-		if (err == 0) {
-			LOG_DBG("Device configuration encoded");
-			send_config_received();
+		enum message_format format = determine_message_format(evt->data.buf, evt->data.len);
+
+		switch (format) {
+		case JSON_CONFIG:
+			LOG_DBG("Incoming message in JSON format.");
+
+			/* Use the config copy when populating the config variable
+			* before it is sent to the Data module. This way we avoid
+			* sending uninitialized variables to the Data module.
+			*/
+			err = cloud_codec_decode_config(evt->data.buf, &copy_cfg);
+			if (err == 0) {
+				LOG_DBG("Device configuration encoded");
+				send_config_received();
+			} else if (err == -ENODATA) {
+				LOG_WRN("Device configuration empty!");
+				SEND_EVENT(cloud, CLOUD_EVT_CONFIG_EMPTY);
+			} else if (err == -ECANCELED) {
+				/* The incoming message has already been handled, ignored. */
+			} else if (err == -ENOENT) {
+				/* Encoding of incoming message is not supported. */
+			} else {
+				LOG_ERR("Decoding of device configuration, error: %d", err);
+				SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+			}
 			break;
-		} else if (err == -ENODATA) {
-			LOG_WRN("Device configuration empty!");
-			SEND_EVENT(cloud, CLOUD_EVT_CONFIG_EMPTY);
+		case JSON_PGPS && IS_ENABLED(CONFIG_NRF_CLOUD_PGPS):
+			LOG_DBG("Incoming message in JSON_PGPS format.");
+
+			err = nrf_cloud_pgps_process(buf, len);
+			if (err) {
+				LOG_ERR("Error processing PGPS packet: %d", err);
+			}
+
+			/* Notify PGPS handler when PGPS is ready. */
+			err = nrf_cloud_pgps_notify_prediction();
+			if (err) {
+				LOG_ERR("error requesting notification of prediction availability: %d", err);
+			}
 			break;
-		} else if (err == -ECANCELED) {
-			/* The incoming message has already been handled, ignored. */
+		case AGPS_BINARY && IS_ENABLED(CONFIG_AGPS):
+			LOG_DBG("The incoming message is in binary AGPS format.");
+
+			err = gps_process_agps_data(buf, len);
+			if (err) {
+				LOG_WRN("Unable to process agps data, error: %d", err);
+			}
 			break;
-		} else if (err == -ENOENT) {
-			/* Encoding of incoming message is not supported. Proceed to check if the
-			 * message is AGPS/PGPS related data.
-			 */
-		} else {
-			LOG_ERR("Decoding of device configuration, error: %d", err);
-			SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+		default:
+			LOG_ERR("Received data format unknown");
 			break;
 		}
-
-		/* If incoming message is AGPS/PGPS related, handle it. */
-		agps_data_handle(evt->data.buf, evt->data.len);
 		break;
 	case CLOUD_WRAP_EVT_FOTA_DONE: {
 		LOG_DBG("CLOUD_WRAP_EVT_FOTA_DONE");
@@ -379,6 +378,29 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 }
 
 /* Static module functions. */
+/* Function used to determine the format of the incoming message from cloud. */
+static enum message_format determine_message_format(uint8_t *buf, size_t len)
+{
+	enum message_format retval = UNKNOWN;
+
+	/* Look into doing this check with some additional magic that the AGPS data always
+	 * begins with.
+	 */
+	if (buf[NRF_CLOUD_AGPS_BIN_SCHEMA_VERSION_INDEX] == NRF_CLOUD_AGPS_BIN_SCHEMA_VERSION) {
+		return AGPS;
+	}
+
+	cJSON *root_obj = cJSON_ParseWithLength(buf, len);
+
+	if (cJSON_IsObject(root_obj)) {
+		retval = JSON;
+	}
+
+exit:
+	cJSON_Delete(root_obj);
+	return retval;
+}
+
 static void send_data_ack(void *ptr, size_t len, bool sent)
 {
 	struct cloud_module_event *cloud_module_event =
