@@ -338,7 +338,6 @@ Configurations for Azure IoT Hub library
 * :option:`CONFIG_AZURE_IOT_HUB_DPS_HOSTNAME`
 * :option:`CONFIG_AZURE_IOT_HUB_DPS_ID_SCOPE`
 * :option:`CONFIG_AZURE_IOT_HUB_SEC_TAG`
-* :option:`CONFIG_AZURE_FOTA_SEC_TAG`
 
 .. note:
    The nRF Cloud library does not require any library-specific Kconfig options to be set.

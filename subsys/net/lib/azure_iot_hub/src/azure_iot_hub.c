@@ -48,6 +48,12 @@ LOG_MODULE_REGISTER(azure_iot_hub, CONFIG_AZURE_IOT_HUB_LOG_LEVEL);
 #define TOPIC_TWIN_RES		"$iothub/twin/res/#"
 #define TOPIC_DIRECT_METHODS	"$iothub/methods/POST/#"
 
+/* MQTT Message ID used ensure that the IoT Hub has ACKed the last message sent after a
+ * successful FOTA update. After the message has been ACKed it is safe to request a reboot by
+ * sending AZURE_FOTA_EVT_DONE to the application.
+ */
+#define MESSAGE_ID_FOTA_DONE 1993
+
 #define PROP_BAG_STR_BUF_SIZE	(AZURE_IOT_HUB_TOPIC_ELEMENT_MAX_LEN * \
 				AZURE_IOT_HUB_PROPERTY_BAG_MAX_COUNT)
 
@@ -637,6 +643,14 @@ static void mqtt_evt_handler(struct mqtt_client *const client,
 		evt.data.message_id = mqtt_evt->param.puback.message_id;
 
 		azure_iot_hub_notify_event(&evt);
+
+#if IS_ENABLED(CONFIG_AZURE_FOTA)
+		if (mqtt_evt->param.puback.message_id == MESSAGE_ID_FOTA_DONE) {
+			memset(&evt, 0, sizeof(struct azure_iot_hub_evt));
+			evt.type = AZURE_IOT_HUB_EVT_FOTA_DONE;
+			azure_iot_hub_notify_event(&evt);
+		}
+#endif
 		break;
 	case MQTT_EVT_SUBACK:
 		LOG_DBG("MQTT_EVT_SUBACK: id = %d result = %d",
@@ -1032,7 +1046,17 @@ static void dps_handler(enum dps_reg_state state)
 
 #if IS_ENABLED(CONFIG_AZURE_FOTA)
 
-static void fota_report_send(struct azure_fota_event *evt)
+/**
+ * @brief Send FOTA report to Azure IoT Hub.
+ *
+ * @param[in] evt Pointer to event containing the FOTA report to be sent.
+ * @param[in] fota_done Flag signifying if FOTA has downloaded successfully and that the message to
+ *                      be sent is the last one before a reboot is requested. If this flag is
+ *                      enabled the message will be sent with QoS 1. When the acknowledgment is
+ *			received in the corresponding PUBACK the library will notify the application
+ *			that a reboot can occur.
+ */
+static void fota_report_send(struct azure_fota_event *evt, bool fota_done)
 {
 	int err;
 	struct azure_iot_hub_data msg = {
@@ -1044,6 +1068,11 @@ static void fota_report_send(struct azure_fota_event *evt)
 	if (evt->report == NULL) {
 		LOG_WRN("No report available to send");
 		return;
+	}
+
+	if (fota_done) {
+		msg.qos = MQTT_QOS_1_AT_LEAST_ONCE;
+		msg.message_id = MESSAGE_ID_FOTA_DONE;
 	}
 
 	err = azure_iot_hub_send(&msg);
@@ -1066,19 +1095,17 @@ static void fota_evt_handler(struct azure_fota_event *fota_evt)
 	switch (fota_evt->type) {
 	case AZURE_FOTA_EVT_REPORT:
 		LOG_DBG("AZURE_FOTA_EVT_REPORT");
-		fota_report_send(fota_evt);
+		fota_report_send(fota_evt, false);
 		break;
 	case AZURE_FOTA_EVT_START:
 		LOG_DBG("AZURE_FOTA_EVT_START");
 		evt.type = AZURE_IOT_HUB_EVT_FOTA_START;
-		fota_report_send(fota_evt);
+		fota_report_send(fota_evt, false);
 		azure_iot_hub_notify_event(&evt);
 		break;
 	case AZURE_FOTA_EVT_DONE:
 		LOG_DBG("AZURE_FOTA_EVT_DONE");
-		evt.type = AZURE_IOT_HUB_EVT_FOTA_DONE;
-		fota_report_send(fota_evt);
-		azure_iot_hub_notify_event(&evt);
+		fota_report_send(fota_evt, true);
 		break;
 	case AZURE_FOTA_EVT_ERASE_PENDING:
 		LOG_DBG("AZURE_FOTA_EVT_ERASE_PENDING");
@@ -1092,7 +1119,7 @@ static void fota_evt_handler(struct azure_fota_event *fota_evt)
 		break;
 	case AZURE_FOTA_EVT_ERROR:
 		LOG_ERR("AZURE_FOTA_EVT_ERROR");
-		fota_report_send(fota_evt);
+		fota_report_send(fota_evt, false);
 		evt.type = AZURE_IOT_HUB_EVT_FOTA_ERROR;
 		azure_iot_hub_notify_event(&evt);
 		break;
