@@ -104,7 +104,12 @@ static int add_data(cJSON *parent, const char *app_id, const char *str_val,
 		goto exit;
 	}
 
-	json_add_obj(parent, object_name, data_obj);
+	if (!json_add_obj(parent, object_name, data_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", log_strdup(object_name));
+		err = -ECANCELED;
+		goto exit;
+	}
+
 	return 0;
 
 exit:
@@ -188,8 +193,20 @@ int cloud_codec_encode_config(struct cloud_codec_data *output,
 
 	err = json_common_config_add(rep_obj, data, DATA_CONFIG);
 
-	json_add_obj(state_obj, OBJECT_REPORTED, rep_obj);
-	json_add_obj(root_obj, OBJECT_STATE, state_obj);
+	if (!json_add_obj(state_obj, OBJECT_REPORTED, rep_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", OBJECT_REPORTED);
+		cJSON_Delete(rep_obj);
+		cJSON_Delete(state_obj);
+		err = -ECANCELED;
+		goto exit;
+	}
+
+	if (!json_add_obj(root_obj, OBJECT_STATE, state_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", OBJECT_STATE);
+		cJSON_Delete(state_obj);
+		err = -ECANCELED;
+		goto exit;
+	}
 
 	if (err) {
 		goto exit;
@@ -345,7 +362,16 @@ int cloud_codec_encode_data(struct cloud_codec_data *output,
 			bat_buf->queued = false;
 		}
 
-		json_add_obj(dev_obj, DATA_MODEM_STATIC, data_ref);
+		if (!json_add_obj(dev_obj, DATA_MODEM_STATIC, data_ref)) {
+			LOG_ERR("Failed to add object \"%s\"", DATA_MODEM_STATIC);
+			cJSON_Delete(data_ref);
+			cJSON_Delete(dev_obj);
+			cJSON_Delete(rep_obj);
+			cJSON_Delete(state_obj);
+			err = -ECANCELED;
+			goto exit;
+		}
+
 	} else {
 		/* If deviceInfo is empty but battery data is queued, we create a deviceInfo object
 		 * and populate it with battery data.
@@ -364,8 +390,17 @@ int cloud_codec_encode_data(struct cloud_codec_data *output,
 				goto add_object;
 			}
 
+			if (!json_add_obj(dev_obj, DATA_MODEM_STATIC, data_ref)) {
+				LOG_ERR("Failed to add object \"%s\"", DATA_MODEM_STATIC);
+				cJSON_Delete(data_ref);
+				cJSON_Delete(dev_obj);
+				cJSON_Delete(rep_obj);
+				cJSON_Delete(state_obj);
+				err = -ECANCELED;
+				goto exit;
+			}
+
 			state_obj_added = true;
-			json_add_obj(dev_obj, DATA_MODEM_STATIC, data_ref);
 			bat_buf->queued = false;
 		}
 	}
@@ -385,16 +420,42 @@ int cloud_codec_encode_data(struct cloud_codec_data *output,
 	data_ref = cJSON_DetachItemFromObject(modem_dynamic_ref, DATA_VALUE);
 	cJSON_Delete(modem_dynamic_ref);
 	if (data_ref != NULL) {
-		json_add_obj(dev_obj, DATA_MODEM_DYNAMIC, data_ref);
+		if (!json_add_obj(dev_obj, DATA_MODEM_DYNAMIC, data_ref)) {
+			LOG_ERR("Failed to add object \"%s\"", DATA_MODEM_DYNAMIC);
+			cJSON_Delete(data_ref);
+			cJSON_Delete(dev_obj);
+			cJSON_Delete(rep_obj);
+			cJSON_Delete(state_obj);
+			err = -ECANCELED;
+			goto exit;
+		}
 	}
 
 add_object:
 
 	/* Delete state object if empty. */
 	if (state_obj_added) {
-		json_add_obj(rep_obj, OBJECT_DEVICE, dev_obj);
-		json_add_obj(state_obj, OBJECT_REPORTED, rep_obj);
-		json_add_obj(root_obj, OBJECT_STATE, state_obj);
+		if (!json_add_obj(rep_obj, OBJECT_DEVICE, dev_obj)) {
+			LOG_ERR("Failed to add object \"%s\"", OBJECT_DEVICE);
+			cJSON_Delete(state_obj);
+			err = -ECANCELED;
+			goto exit;
+		}
+
+		if (!json_add_obj(state_obj, OBJECT_REPORTED, rep_obj)) {
+			LOG_ERR("Failed to add object \"%s\"", OBJECT_REPORTED);
+			cJSON_Delete(rep_obj);
+			cJSON_Delete(state_obj);
+			err = -ECANCELED;
+			goto exit;
+		}
+
+		if (!json_add_obj(root_obj, OBJECT_STATE, state_obj)) {
+			LOG_ERR("Failed to add object \"%s\"", OBJECT_STATE);
+			cJSON_Delete(state_obj);
+			err = -ECANCELED;
+			goto exit;
+		}
 	} else {
 		cJSON_Delete(dev_obj);
 		cJSON_Delete(rep_obj);

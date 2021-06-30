@@ -25,7 +25,11 @@ static int op_code_handle(cJSON *parent, enum json_common_op_code op,
 			LOG_WRN("Passed in parent object is not an array");
 			return -EINVAL;
 		}
-		json_add_obj_array(parent, child);
+
+		if (!json_add_obj_array(parent, child)) {
+			LOG_ERR("Failed to add object to array");
+			return -ECANCELED;
+		}
 		break;
 	case JSON_COMMON_ADD_DATA_TO_OBJECT:
 		if (!cJSON_IsObject(parent)) {
@@ -37,7 +41,10 @@ static int op_code_handle(cJSON *parent, enum json_common_op_code op,
 			LOG_WRN("Missing object label");
 			return -EINVAL;
 		}
-		json_add_obj(parent, object_label, child);
+		if (!json_add_obj(parent, object_label, child)) {
+			LOG_ERR("Failed to add object \n%s\n to parent", object_label);
+			return -ECANCELED;
+		}
 		break;
 	case JSON_COMMON_GET_POINTER_TO_OBJECT:
 		if (*parent_ref != NULL) {
@@ -131,7 +138,11 @@ int json_common_modem_static_data_add(cJSON *parent,
 		goto exit;
 	}
 
-	json_add_obj(modem_obj, DATA_VALUE, modem_val_obj);
+	if (!json_add_obj(modem_obj, DATA_VALUE, modem_val_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", DATA_VALUE);
+		err = -ECANCELED;
+		goto exit;
+	}
 
 	err = json_add_number(modem_obj, DATA_TIMESTAMP, data->ts);
 	if (err) {
@@ -247,7 +258,11 @@ int json_common_modem_dynamic_data_add(cJSON *parent,
 		goto exit;
 	}
 
-	json_add_obj(modem_obj, DATA_VALUE, modem_val_obj);
+	if (!json_add_obj(modem_obj, DATA_VALUE, modem_val_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", DATA_VALUE);
+		err = -ECANCELED;
+		goto exit;
+	}
 
 	err = json_add_number(modem_obj, DATA_TIMESTAMP, data->ts);
 	if (err) {
@@ -310,7 +325,11 @@ int json_common_sensor_data_add(cJSON *parent,
 		goto exit;
 	}
 
-	json_add_obj(sensor_obj, DATA_VALUE, sensor_val_obj);
+	if (!json_add_obj(sensor_obj, DATA_VALUE, sensor_val_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", DATA_VALUE);
+		err = -ECANCELED;
+		goto exit;
+	}
 
 	err = json_add_number(sensor_obj, DATA_TIMESTAMP, data->env_ts);
 	if (err) {
@@ -399,7 +418,11 @@ int json_common_gps_data_add(cJSON *parent,
 			goto exit;
 		}
 
-		json_add_obj(gps_obj, DATA_VALUE, gps_val_obj);
+		if (!json_add_obj(gps_obj, DATA_VALUE, gps_val_obj)) {
+			LOG_ERR("Failed to add object \"%s\"", DATA_VALUE);
+			err = -ECANCELED;
+			goto exit;
+		}
 		break;
 	case CLOUD_CODEC_GPS_FORMAT_NMEA:
 		cJSON_Delete(gps_val_obj);
@@ -484,7 +507,11 @@ int json_common_accel_data_add(cJSON *parent,
 		goto exit;
 	}
 
-	json_add_obj(accel_obj, DATA_VALUE, accel_val_obj);
+	if (!json_add_obj(accel_obj, DATA_VALUE, accel_val_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", DATA_VALUE);
+		err = -ECANCELED;
+		goto exit;
+	}
 
 	err = json_add_number(accel_obj, DATA_TIMESTAMP, data->ts);
 	if (err) {
@@ -694,7 +721,11 @@ int json_common_config_add(cJSON *parent, struct cloud_data_cfg *data, const cha
 		goto exit;
 	}
 
-	json_add_obj(parent, object_label, config_obj);
+	if (!json_add_obj(parent, object_label, config_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", log_strdup(object_label));
+		err = -ECANCELED;
+		goto exit;
+	}
 
 	return 0;
 
@@ -847,6 +878,11 @@ int json_common_batch_data_add(cJSON *parent, enum json_common_buffer_type type,
 		return -ENODATA;
 	}
 
-	json_add_obj(parent, object_label, array_obj);
+	if (!json_add_obj(parent, object_label, array_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", log_strdup(object_label));
+		cJSON_Delete(array_obj);
+		return -ECANCELED;
+	}
+
 	return 0;
 }

@@ -14,14 +14,14 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(json_helpers, CONFIG_CLOUD_CODEC_LOG_LEVEL);
 
-void json_add_obj(cJSON *parent, const char *str, cJSON *item)
+bool json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
-	cJSON_AddItemToObject(parent, str, item);
+	return cJSON_AddItemToObject(parent, str, item);
 }
 
-void json_add_obj_array(cJSON *parent, cJSON *item)
+bool json_add_obj_array(cJSON *parent, cJSON *item)
 {
-	cJSON_AddItemToArray(parent, item);
+	return cJSON_AddItemToArray(parent, item);
 }
 
 int json_add_number(cJSON *parent, const char *str, double item)
@@ -33,7 +33,11 @@ int json_add_number(cJSON *parent, const char *str, double item)
 		return -ENOMEM;
 	}
 
-	json_add_obj(parent, str, json_num);
+	if (!json_add_obj(parent, str, json_num)) {
+		LOG_ERR("Failed to add number \n%s\n", log_strdup(str));
+		cJSON_Delete(json_num);
+		return -ECANCELED;
+	}
 
 	return 0;
 }
@@ -47,7 +51,11 @@ int json_add_bool(cJSON *parent, const char *str, int item)
 		return -ENOMEM;
 	}
 
-	json_add_obj(parent, str, json_bool);
+	if (!json_add_obj(parent, str, json_bool)) {
+		LOG_ERR("Failed to add boolean \n%s\n", log_strdup(str));
+		cJSON_Delete(json_bool);
+		return -ECANCELED;
+	}
 
 	return 0;
 }
@@ -66,7 +74,11 @@ int json_add_str(cJSON *parent, const char *str, const char *item)
 		return -ENOMEM;
 	}
 
-	json_add_obj(parent, str, json_str);
+	if (!json_add_obj(parent, str, json_str)) {
+		LOG_ERR("Failed to add string \n%s\n", log_strdup(str));
+		cJSON_Delete(json_str);
+		return -ECANCELED;
+	}
 
 	return 0;
 }

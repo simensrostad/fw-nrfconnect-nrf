@@ -6,9 +6,9 @@
 
 #include "cJSON.h"
 
-void json_add_obj(cJSON *parent, const char *str, cJSON *item);
+bool json_add_obj(cJSON *parent, const char *str, cJSON *item);
 
-void json_add_obj_array(cJSON *parent, cJSON *item);
+bool json_add_obj_array(cJSON *parent, cJSON *item);
 
 int json_add_number(cJSON *parent, const char *str, double item);
 

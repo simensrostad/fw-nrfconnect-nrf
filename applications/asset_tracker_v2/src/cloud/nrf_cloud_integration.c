@@ -238,7 +238,12 @@ static int decode_and_send(cJSON *object, const char *object_name, bool device_s
 				return -ENOMEM;
 			}
 
-			json_add_obj(state_obj, OBJECT_STATE, msg_ref);
+			if (!json_add_obj(state_obj, OBJECT_STATE, msg_ref)) {
+				LOG_ERR("Failed to add object \"%s\"", OBJECT_STATE);
+				cJSON_Delete(msg_ref);
+				cJSON_Delete(state_obj);
+				return -ECANCELED;
+			}
 
 			tx_buffer = cJSON_Print(state_obj);
 			cJSON_Delete(state_obj);

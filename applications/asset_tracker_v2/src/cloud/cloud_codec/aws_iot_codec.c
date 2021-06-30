@@ -125,8 +125,20 @@ int cloud_codec_encode_config(struct cloud_codec_data *output,
 
 	err = json_common_config_add(rep_obj, data, DATA_CONFIG);
 
-	json_add_obj(state_obj, OBJECT_REPORTED, rep_obj);
-	json_add_obj(root_obj, OBJECT_STATE, state_obj);
+	if (!json_add_obj(state_obj, OBJECT_REPORTED, rep_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", OBJECT_REPORTED);
+		cJSON_Delete(rep_obj);
+		cJSON_Delete(state_obj);
+		err = -ECANCELED;
+		goto exit;
+	}
+
+	if (!json_add_obj(root_obj, OBJECT_STATE, state_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", OBJECT_STATE);
+		cJSON_Delete(state_obj);
+		err = -ECANCELED;
+		goto exit;
+	}
 
 	if (err) {
 		goto exit;
@@ -248,8 +260,20 @@ int cloud_codec_encode_data(struct cloud_codec_data *output,
 
 add_object:
 
-	json_add_obj(state_obj, OBJECT_REPORTED, rep_obj);
-	json_add_obj(root_obj, OBJECT_STATE, state_obj);
+	if (!json_add_obj(state_obj, OBJECT_REPORTED, rep_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", OBJECT_REPORTED);
+		cJSON_Delete(rep_obj);
+		cJSON_Delete(state_obj);
+		err = -ECANCELED;
+		goto exit;
+	}
+
+	if (!json_add_obj(root_obj, OBJECT_STATE, state_obj)) {
+		LOG_ERR("Failed to add object \"%s\"", OBJECT_STATE);
+		cJSON_Delete(state_obj);
+		err = -ECANCELED;
+		goto exit;
+	}
 
 	/* Check error code after all objects has been added to the root object.
 	 * This way, we only need to clear the root_object upon an error.
