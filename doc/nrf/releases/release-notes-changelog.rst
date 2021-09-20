@@ -60,6 +60,9 @@ nRF9160
   * :ref:`asset_tracker_v2` application:
 
     * Updated the application to start sending batch messages to the new bulk endpoint topic supported in nRF Cloud.
+    * Added new overlay configuration files and split the :file:`prj.conf` file into the various files that now bind specific features.
+      To build with a specific feature, such as A-GPS or communications with AWS IoT, you need to include the respective overlay configuration in the build command.
+      This is documented in :ref:`asset_tracker_v2_description`.
 
   * :ref:`multicell_location` sample:
 

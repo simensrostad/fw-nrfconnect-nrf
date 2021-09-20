@@ -9,6 +9,13 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(MODULE, CONFIG_CLOUD_INTEGRATION_LOG_LEVEL);
 
+BUILD_ASSERT(IS_ENABLED(CONFIG_AGPS_SRC_NRF_CLOUD) == 0,
+	     "The Azure IoT Hub integration only supports A-GPS over SUPL. Enable SUPL by setting "
+	     "CONFIG_AGPS_SRC_SUPL");
+
+BUILD_ASSERT(IS_ENABLED(CONFIG_NRF_CLOUD_PGPS) == 0,
+	     "The Azure IoT Hub integration does not support P-GPS.");
+
 #if !defined(CONFIG_CLOUD_CLIENT_ID_USE_CUSTOM)
 #define CLIENT_ID_LEN 15
 #else

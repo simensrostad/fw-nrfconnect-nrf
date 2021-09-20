@@ -6,6 +6,11 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
+if(NOT DEFINED OVERLAY_CONFIG)
+  message(WARNING "Overlay configuration list is empty, using nRF Cloud as the default cloud provider")
+  list(APPEND OVERLAY_CONFIG "overlay-nrf_cloud.conf")
+endif()
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(asset_tracker_v2)
 
