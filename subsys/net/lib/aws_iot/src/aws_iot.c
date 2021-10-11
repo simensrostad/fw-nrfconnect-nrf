@@ -761,6 +761,11 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 		LOG_DBG("MQTT_EVT_PUBACK: id = %d result = %d",
 			mqtt_evt->param.puback.message_id,
 			mqtt_evt->result);
+
+		aws_iot_evt.type = AWS_IOT_EVT_PUBACK;
+		aws_iot_evt.data.message_id = mqtt_evt->param.puback.message_id;
+
+		aws_iot_notify_event(&aws_iot_evt);
 		break;
 	case MQTT_EVT_SUBACK:
 		LOG_DBG("MQTT_EVT_SUBACK: id = %d result = %d",
@@ -1114,9 +1119,19 @@ int aws_iot_send(const struct aws_iot_data *const tx_data)
 	param.message.topic.topic.size	= tx_data_pub.topic.len;
 	param.message.payload.data	= tx_data_pub.ptr;
 	param.message.payload.len	= tx_data_pub.len;
-	param.message_id		= k_cycle_get_32();
-	param.dup_flag			= 0;
-	param.retain_flag		= 0;
+	param.dup_flag			= tx_data_pub.dup_flag;
+	param.retain_flag		= tx_data_pub.retain_flag;
+
+	/* If message ID has not been set by the application, a random message ID is assigned
+	 * to the packet.
+	 */
+	if (tx_data_pub.message_id == 0) {
+		param.message_id = k_cycle_get_32();
+		LOG_DBG("Using message ID %d set by the library", param.message_id);
+	} else {
+		param.message_id = tx_data_pub.message_id;
+		LOG_DBG("Using message ID %d set by the application", param.message_id);
+	}
 
 	LOG_DBG("Publishing to topic: %s",
 		log_strdup(param.message.topic.topic.utf8));

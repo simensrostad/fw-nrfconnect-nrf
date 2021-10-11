@@ -15,6 +15,8 @@ enum cloud_wrap_event_type {
 	CLOUD_WRAP_EVT_DISCONNECTED,
 	/** Data received from cloud integration layer. */
 	CLOUD_WRAP_EVT_DATA_RECEIVED,
+	/** Event recieved when data has been acknowledged by cloud. */
+	CLOUD_WRAP_EVT_DATA_ACK,
 	/** A-GPS data received from the cloud integration layer. */
 	CLOUD_WRAP_EVT_AGPS_DATA_RECEIVED,
 	/** P-GPS data received from the cloud integration layer. */
@@ -47,6 +49,7 @@ struct cloud_wrap_event {
 	union {
 		struct cloud_wrap_event_data data;
 		int err;
+		uint16_t message_id;
 	};
 };
 
