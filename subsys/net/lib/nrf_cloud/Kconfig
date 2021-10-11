@@ -3,11 +3,19 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-menuconfig NRF_CLOUD
-	bool "nRF Cloud Library"
-	select CJSON_LIB
+
+module = NRF_CLOUD
+module-prompt = "nRF_Cloud_Library"
+orsource "../Kconfig.cloud_$(CLOUD_SERVICE_SELECTOR)"
+
+config $(module)
+	bool
+	prompt "nRF Cloud Library" if !CLOUD_SERVICE_MUTUAL_EXCLUSIVE
+	select CJSON_LIB if NEWLIB_LIBC || EXTERNAL_LIBC
 
 if NRF_CLOUD
+
+menu "nRF Cloud Library"
 
 config NRF_CLOUD_HOST_NAME
 	string "nRF Cloud server hostname"
@@ -50,5 +58,7 @@ module-dep=LOG
 module-str=Log level for nRF Cloud
 module-help=Enables nRF Cloud log messages.
 source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
 
 endif # NRF_CLOUD
