@@ -4,6 +4,35 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
+# Only a single cloud service is supported by this application.
+CLOUD_SERVICE_SELECTOR := choice
+
+if NRF_CLOUD
+
+config NRF_CLOUD_MQTT
+	default y
+
+config NRF_CLOUD_CONNECTION_POLL_THREAD
+	default y
+
+choice NRF_CLOUD_SEND_SOCKET
+	default NRF_CLOUD_SEND_TIMEOUT
+endchoice
+
+# MQTT Transport library
+# Maximum specified MQTT keepalive timeout for nRF Cloud is 1200 seconds.
+config MQTT_KEEPALIVE
+	default 1200
+
+config MQTT_CLEAN_SESSION
+	default y
+
+choice GPS_MODULE_DATA_FORMAT
+	default GPS_MODULE_NMEA
+endchoice
+
+endif
+
 menu "Asset Tracker"
 
 config ASSET_TRACKER_V2_APP_VERSION

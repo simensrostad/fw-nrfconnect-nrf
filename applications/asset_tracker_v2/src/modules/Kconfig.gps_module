@@ -11,7 +11,7 @@ menuconfig GPS_MODULE
 
 if GPS_MODULE
 
-choice
+choice GPS_MODULE_DATA_FORMAT
 	prompt "Select GNSS data format"
 	default GPS_MODULE_PVT
 
