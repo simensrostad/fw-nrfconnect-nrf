@@ -42,8 +42,6 @@ struct cloud_module_event_data {
 struct cloud_module_data_ack {
 	void *ptr;
 	size_t len;
-	/* Flag to signify if the data was sent or not. */
-	bool sent;
 };
 
 /** @brief Cloud event. */

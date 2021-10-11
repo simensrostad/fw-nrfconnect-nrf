@@ -35,6 +35,7 @@
 #include "events/modem_module_event.h"
 #include "events/gps_module_event.h"
 #include "events/debug_module_event.h"
+#include "qos.h"
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(MODULE, CONFIG_CLOUD_MODULE_LOG_LEVEL);
@@ -111,6 +112,7 @@ static struct module_data self = {
 /* Forward declarations. */
 static void connect_check_work_fn(struct k_work *work);
 static void send_config_received(void);
+static void send_data_ack(void *ptr, size_t len);
 
 /* Convenience functions used in internal state handling. */
 static char *state2str(enum state_type state)
@@ -260,6 +262,32 @@ static void agps_data_handle(const uint8_t *buf, size_t len)
 	(void)err;
 }
 
+static void qos_event_handler(const struct qos_evt *const evt)
+{
+
+	switch (evt->type) {
+	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_GENERIC:
+
+		break;
+	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_BATCH:
+		break;
+	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_UI:
+		break;
+	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_NEIGHBOR_CELLS:
+		break;
+	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_AGPS_REQUEST:
+		break;
+	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_CONFIG:
+		break;
+	case QOS_EVT_MESSAGE_ACKED:
+		/* Send pointer and length to data module to be freed. */
+		send_data_ack(evt->message.buf, evt->message.len);
+		break;
+	default:
+		break;
+	}
+}
+
 static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 {
 	switch (evt->type) {
@@ -357,7 +385,7 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 }
 
 /* Static module functions. */
-static void send_data_ack(void *ptr, size_t len, bool sent)
+static void send_data_ack(void *ptr, size_t len)
 {
 	struct cloud_module_event *cloud_module_event =
 			new_cloud_module_event();
@@ -369,7 +397,6 @@ static void send_data_ack(void *ptr, size_t len, bool sent)
 
 	cloud_module_event->type = CLOUD_EVT_DATA_ACK;
 	cloud_module_event->data.ack.ptr = ptr;
-	cloud_module_event->data.ack.sent = sent;
 	cloud_module_event->data.ack.len = len;
 
 	EVENT_SUBMIT(cloud_module_event);
@@ -386,138 +413,134 @@ static void send_config_received(void)
 	EVENT_SUBMIT(cloud_module_event);
 }
 
-static void data_send(struct data_module_event *evt)
-{
-	int err;
+// static void data_send(struct data_module_event *evt)
+// {
+// 	int err;
 
-	err = cloud_wrap_data_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err) {
-		LOG_ERR("cloud_wrap_data_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf,
-			      evt->data.buffer.len,
-			      false);
-		return;
-	}
+// 	err = cloud_wrap_data_send(evt->data.buffer.buf, evt->data.buffer.len);
+// 	if (err) {
+// 		LOG_ERR("cloud_wrap_data_send, err: %d", err);
+// 		send_data_ack(evt->data.buffer.buf,
+// 			      evt->data.buffer.len);
+// 		return;
+// 	}
 
-	LOG_DBG("Data sent, data pointer: %p", evt->data.buffer.buf);
+// 	LOG_DBG("Data sent, data pointer: %p", evt->data.buffer.buf);
 
-	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-}
+// 	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// }
 
-static void memfault_data_send(struct debug_module_event *evt)
-{
-	int err;
+// static void memfault_data_send(struct debug_module_event *evt)
+// {
+// 	int err;
 
-	err = cloud_wrap_memfault_data_send(evt->data.memfault.buf, evt->data.memfault.len);
-	if (err) {
-		LOG_ERR("cloud_wrap_memfault_data_send, err: %d", err);
-		return;
-	}
+// 	err = cloud_wrap_memfault_data_send(evt->data.memfault.buf, evt->data.memfault.len);
+// 	if (err) {
+// 		LOG_ERR("cloud_wrap_memfault_data_send, err: %d", err);
+// 		return;
+// 	}
 
-	LOG_DBG("Memfault data sent");
-}
+// 	LOG_DBG("Memfault data sent");
+// }
 
-static void config_send(struct data_module_event *evt)
-{
-	int err;
+// static void config_send(struct data_module_event *evt)
+// {
+// 	int err;
 
-	err = cloud_wrap_state_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err) {
-		LOG_ERR("cloud_wrap_state_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf,
-			      evt->data.buffer.len,
-			      false);
-		return;
-	}
+// 	err = cloud_wrap_state_send(evt->data.buffer.buf, evt->data.buffer.len);
+// 	if (err) {
+// 		LOG_ERR("cloud_wrap_state_send, err: %d", err);
+// 		send_data_ack(evt->data.buffer.buf,
+// 			      evt->data.buffer.len);
+// 		return;
+// 	}
 
-	LOG_DBG("Configuration sent, data pointer: %p", evt->data.buffer.buf);
+// 	LOG_DBG("Configuration sent, data pointer: %p", evt->data.buffer.buf);
 
-	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-}
+// 	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// }
 
-static void config_get(void)
-{
-	int err;
+// static void config_get(void)
+// {
+// 	int err;
 
-	err = cloud_wrap_state_get();
-	if (err) {
-		LOG_ERR("cloud_wrap_state_get, err: %d", err);
-	} else {
-		LOG_DBG("Device configuration requested");
-	}
-}
+// 	err = cloud_wrap_state_get();
+// 	if (err) {
+// 		LOG_ERR("cloud_wrap_state_get, err: %d", err);
+// 	} else {
+// 		LOG_DBG("Device configuration requested");
+// 	}
+// }
 
-static void batch_data_send(struct data_module_event *evt)
-{
-	int err;
+// static void batch_data_send(struct data_module_event *evt)
+// {
+// 	int err;
 
-	err = cloud_wrap_batch_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err) {
-		LOG_ERR("cloud_wrap_batch_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf,
-			      evt->data.buffer.len,
-			      false);
-		return;
-	}
+// 	err = cloud_wrap_batch_send(evt->data.buffer.buf, evt->data.buffer.len);
+// 	if (err) {
+// 		LOG_ERR("cloud_wrap_batch_send, err: %d", err);
+// 		send_data_ack(evt->data.buffer.buf,
+// 			      evt->data.buffer.len);
+// 		return;
+// 	}
 
-	LOG_DBG("Batch sent, data pointer: %p", evt->data.buffer.buf);
+// 	LOG_DBG("Batch sent, data pointer: %p", evt->data.buffer.buf);
 
-	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-}
+// 	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// }
 
-static void ui_data_send(struct data_module_event *evt)
-{
-	int err;
+// static void ui_data_send(struct data_module_event *evt)
+// {
+// 	int err;
 
-	err = cloud_wrap_ui_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err) {
-		LOG_ERR("cloud_wrap_ui_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf,
-			      evt->data.buffer.len,
-			      false);
-		return;
-	}
+// 	err = cloud_wrap_ui_send(evt->data.buffer.buf, evt->data.buffer.len);
+// 	if (err) {
+// 		LOG_ERR("cloud_wrap_ui_send, err: %d", err);
+// 		send_data_ack(evt->data.buffer.buf,
+// 			      evt->data.buffer.len);
+// 		return;
+// 	}
 
-	LOG_DBG("UI sent, data pointer: %p", evt->data.buffer.buf);
+// 	LOG_DBG("UI sent, data pointer: %p", evt->data.buffer.buf);
 
-	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-}
+// 	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// }
 
-static void neighbor_cells_data_send(struct data_module_event *evt)
-{
-	int err;
+// static void neighbor_cells_data_send(struct data_module_event *evt)
+// {
+// 	int err;
 
-	err = cloud_wrap_neighbor_cells_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err == -ENOTSUP) {
-		LOG_DBG("Sending of neighbor cell data is not supported by the "
-			"configured cloud library");
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-	} else if (err) {
-		LOG_ERR("cloud_wrap_neighbor_cells_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, false);
-	} else {
-		LOG_DBG("Neighbor cell data sent, data pointer: %p", evt->data.buffer.buf);
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-	}
-}
+// 	err = cloud_wrap_neighbor_cells_send(evt->data.buffer.buf, evt->data.buffer.len);
+// 	if (err == -ENOTSUP) {
+// 		LOG_DBG("Sending of neighbor cell data is not supported by the "
+// 			"configured cloud library");
+// 		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// 	} else if (err) {
+// 		LOG_ERR("cloud_wrap_neighbor_cells_send, err: %d", err);
+// 		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// 	} else {
+// 		LOG_DBG("Neighbor cell data sent, data pointer: %p", evt->data.buffer.buf);
+// 		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// 	}
+// }
 
-static void agps_data_request_send(struct data_module_event *evt)
-{
-	int err;
+// static void agps_data_request_send(struct data_module_event *evt)
+// {
+// 	int err;
 
-	err = cloud_wrap_agps_request_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err == -ENOTSUP) {
-		LOG_DBG("Sending of A-GPS request is not supported by the "
-			"configured cloud library");
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-	} else if (err) {
-		LOG_ERR("cloud_wrap_agps_request_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, false);
-	} else {
-		LOG_DBG("A-GPS request sent, data pointer: %p", evt->data.buffer.buf);
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-	}
-}
+// 	err = cloud_wrap_agps_request_send(evt->data.buffer.buf, evt->data.buffer.len);
+// 	if (err == -ENOTSUP) {
+// 		LOG_DBG("Sending of A-GPS request is not supported by the "
+// 			"configured cloud library");
+// 		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// 	} else if (err) {
+// 		LOG_ERR("cloud_wrap_agps_request_send, err: %d", err);
+// 		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// 	} else {
+// 		LOG_DBG("A-GPS request sent, data pointer: %p", evt->data.buffer.buf);
+// 		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len);
+// 	}
+// }
 
 #if defined(CONFIG_NRF_CLOUD_PGPS)
 static void pgps_request_send(struct cloud_codec_data *data)
@@ -678,6 +701,12 @@ static int setup(void)
 		return err;
 	}
 
+	int err = qos_init(qos_event_handler);
+	if (err) {
+		LOG_ERR("qos_init, error: %d", err);
+		return err;
+	}
+
 	/* After a successful initializaton, tell the bootloader that the
 	 * current image is confirmed to be working.
 	 */
@@ -744,36 +773,27 @@ static void on_sub_state_cloud_connected(struct cloud_msg_data *msg)
 		return;
 	}
 
-	if (IS_EVENT(msg, data, DATA_EVT_AGPS_REQUEST_DATA_SEND)) {
-		agps_data_request_send(&msg->module.data);
-	}
-
-	if (IS_EVENT(msg, debug, DEBUG_EVT_MEMFAULT_DATA_READY)) {
+	/* Memfault data is directly sent from the debug module and does not get handled by
+	 * the QoS library.
+	 */
+	if (IS_EVENT(msg, data, DEBUG_EVT_MEMFAULT_DATA_READY)) {
 		memfault_data_send(&msg->module.debug);
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_DATA_SEND)) {
-		data_send(&msg->module.data);
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_SEND)) {
-		config_send(&msg->module.data);
 	}
 
 	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_GET)) {
 		config_get();
 	}
 
-	if (IS_EVENT(msg, data, DATA_EVT_DATA_SEND_BATCH)) {
-		batch_data_send(&msg->module.data);
-	}
+	/** Data buffers received from the data module are sent to the QoS library. */
+	/** Consider moving handling of these event to on_all_states. */
+	if (IS_EVENT(msg, data, DATA_EVT_DATA_SEND)) {
+		/* Add data to qos library */
+		int err = qos_message_add(&msg->module.data.data.message);
 
-	if (IS_EVENT(msg, data, DATA_EVT_UI_DATA_SEND)) {
-		ui_data_send(&msg->module.data);
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_NEIGHBOR_CELLS_DATA_SEND)) {
-		neighbor_cells_data_send(&msg->module.data);
+		if (err) {
+			LOG_ERR("qos_message_add failed, error: %d", err);
+			SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+		}
 	}
 
 	/* To properly initialize the nRF Cloud PGPS library we need to be connected to cloud and

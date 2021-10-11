@@ -120,28 +120,6 @@ static int recv_req_data_count;
  */
 static int req_data_count;
 
-/* List of data types sent out by the data module. */
-enum data_type {
-	UNUSED,
-	GENERIC,
-	BATCH,
-	UI,
-	NEIGHBOR_CELLS,
-	AGPS_REQUEST,
-	CONFIG
-};
-
-struct ack_data {
-	enum data_type type;
-	size_t len;
-	void *ptr;
-};
-
-/* Data that has been attempted to be sent but failed. */
-static struct ack_data failed_data[CONFIG_FAILED_DATA_COUNT];
-
-/* Data that has been encoded and shipped on, but has not yet been ACKed. */
-static struct ack_data pending_data[CONFIG_PENDING_DATA_COUNT];
 
 /* Data module message queue. */
 #define DATA_QUEUE_ENTRY_COUNT		10
@@ -310,151 +288,6 @@ static void date_time_event_handler(const struct date_time_evt *evt)
 	}
 }
 
-/* Static module functions. */
-static void data_list_clear_entry(struct ack_data *data)
-{
-	data->ptr = NULL,
-	data->len = 0;
-	data->type = UNUSED;
-}
-
-static void data_list_clear_and_free(struct ack_data *list, size_t list_count)
-{
-	for (size_t i = 0; i < list_count; i++) {
-		if (list[i].ptr != NULL) {
-			k_free(list[i].ptr);
-			data_list_clear_entry(&list[i]);
-		}
-	}
-
-	LOG_WRN("Data list cleared and freed");
-}
-
-static void data_list_add_failed(void *ptr, size_t len, enum data_type type)
-{
-	while (true) {
-		for (size_t i = 0; i < ARRAY_SIZE(failed_data); i++) {
-			if (failed_data[i].ptr == NULL) {
-				failed_data[i].ptr = ptr;
-				failed_data[i].len = len;
-				failed_data[i].type = type;
-
-				LOG_DBG("Failed data added: %p",
-					failed_data[i].ptr);
-				return;
-			}
-		}
-
-		LOG_WRN("Could not add data to failed data list, list is full");
-		LOG_WRN("Clearing failed data list and adding data");
-
-		data_list_clear_and_free(failed_data, ARRAY_SIZE(failed_data));
-	}
-}
-
-static void data_list_add_pending(void *ptr, size_t len, enum data_type type)
-{
-	for (size_t i = 0; i < ARRAY_SIZE(pending_data); i++) {
-		if (pending_data[i].ptr == NULL) {
-			pending_data[i].ptr = ptr;
-			pending_data[i].len = len;
-			pending_data[i].type = type;
-
-			LOG_DBG("Pending data added: %p", pending_data[i].ptr);
-			return;
-		}
-	}
-
-	LOG_ERR("Could not add data to pending data list, list is full");
-	SEND_ERROR(data, DATA_EVT_ERROR, -ENFILE);
-}
-
-static void data_resend(void)
-{
-	struct data_module_event *evt;
-
-	for (size_t i = 0; i < ARRAY_SIZE(failed_data); i++) {
-		if (failed_data[i].ptr != NULL) {
-
-			evt = new_data_module_event();
-
-			switch (failed_data[i].type) {
-			case GENERIC:
-				evt->type = DATA_EVT_DATA_SEND;
-				break;
-			case BATCH:
-				evt->type = DATA_EVT_DATA_SEND_BATCH;
-				break;
-			case CONFIG:
-				evt->type = DATA_EVT_CONFIG_SEND;
-				break;
-			case UI:
-				evt->type = DATA_EVT_UI_DATA_SEND;
-				break;
-			case NEIGHBOR_CELLS:
-				evt->type = DATA_EVT_NEIGHBOR_CELLS_DATA_SEND;
-				break;
-			case AGPS_REQUEST:
-				evt->type = DATA_EVT_AGPS_REQUEST_DATA_SEND;
-				break;
-			default:
-				LOG_WRN("Unknown associated data type");
-				SEND_ERROR(data, DATA_EVT_ERROR, -ENODATA);
-				return;
-			}
-
-			evt->data.buffer.buf = failed_data[i].ptr;
-			evt->data.buffer.len = failed_data[i].len;
-			LOG_WRN("Resending data: %.*s", failed_data[i].len,
-				log_strdup(failed_data[i].ptr));
-			EVENT_SUBMIT(evt);
-
-			/* Move data from failed to pending data list after
-			 * resend.
-			 */
-
-			/* Add entry to pending data list. */
-			data_list_add_pending(failed_data[i].ptr,
-					      failed_data[i].len,
-					      failed_data[i].type);
-
-			/* Remove entry from failed data list. */
-			data_list_clear_entry(&failed_data[i]);
-		}
-	}
-}
-
-static void data_ack(void *ptr, bool sent)
-{
-	/* Move data from pending to failed data list if incoming data is
-	 * flagged as not sent. If data is flagged as sent, free entry in
-	 * pending data list.
-	 */
-
-	for (size_t i = 0; i < ARRAY_SIZE(pending_data); i++) {
-		if (pending_data[i].ptr == ptr) {
-			if (sent) {
-				k_free(ptr);
-				LOG_DBG("Pending data ACKed: %p",
-					pending_data[i].ptr);
-			} else {
-				LOG_DBG("Moving %p data from pending to failed",
-					pending_data[i].ptr);
-
-				/* Add data to failed data list. */
-				data_list_add_failed(pending_data[i].ptr,
-						     pending_data[i].len,
-						     pending_data[i].type);
-			}
-			data_list_clear_entry(&pending_data[i]);
-			return;
-		}
-	}
-
-	LOG_ERR("No matching pointer was found in pending data list");
-	SEND_ERROR(data, DATA_EVT_ERROR, -ENOTDIR);
-}
-
 static int save_config(const void *buf, size_t buf_len)
 {
 	int err;
@@ -530,17 +363,52 @@ static void config_distribute(enum data_module_event_type type)
 	EVENT_SUBMIT(data_module_event);
 }
 
-static void data_send(enum data_module_event_type event,
-		      enum data_type type,
-		      struct cloud_codec_data *data)
+static void data_send(enum qos_data_type type, struct cloud_codec_data *data)
 {
 	struct data_module_event *module_event = new_data_module_event();
 
-	module_event->type = event;
-	module_event->data.buffer.buf = data->buf;
-	module_event->data.buffer.len = data->len;
+	module_event->type = DATA_EVT_DATA_SEND;
+	module_event->data.message.buf = data->buf;
+	module_event->data.message.len = data->len;
+	module_event->data.message.type = type;
 
-	data_list_add_pending(data->buf, data->len, type);
+	/* Set priority and reliability based on content of the packet to be sent */
+	switch (type) {
+	case GENERIC:
+		module_event->data.message.reliability = QOS_RELIABILITY_NO_ACK;
+		module_event->data.message.priority = QOS_PRIORITY_LOW;
+		break;
+	case BATCH:
+		module_event->data.message.reliability = QOS_RELIABILITY_ACK_REQUIRED;
+		module_event->data.message.priority = QOS_PRIORITY_HIGH;
+		break;
+	case UI:
+		module_event->data.message.reliability = QOS_RELIABILITY_ACK_REQUIRED;
+		module_event->data.message.priority = QOS_PRIORITY_HIGH;
+		break;
+	case NEIGHBOR_CELLS:
+		module_event->data.message.reliability = QOS_RELIABILITY_NO_ACK;
+		module_event->data.message.priority = QOS_PRIORITY_LOW;
+		break;
+	case AGPS_REQUEST:
+		module_event->data.message.reliability = QOS_RELIABILITY_ACK_REQUIRED;
+		module_event->data.message.priority = QOS_PRIORITY_LOW;
+		break;
+	case CONFIG:
+		module_event->data.message.reliability = QOS_RELIABILITY_ACK_REQUIRED;
+		module_event->data.message.priority = QOS_PRIORITY_HIGH;
+		break;
+	default:
+		LOG_WRN("No data type associated with this packet, assume generic packet and "
+			"low priority");
+		module_event->data.message.reliability = QOS_RELIABILITY_NO_ACK;
+		module_event->data.message.priority = QOS_PRIORITY_LOW;
+		break;
+	}
+
+	/* Consider moving this to a separate API or to a different location */
+	LOG_WRN("Data allocated: %p", module_event->data.message.buf);
+
 	EVENT_SUBMIT(module_event);
 
 	/* Reset buffer */
@@ -566,7 +434,7 @@ static void data_encode(void)
 	switch (err) {
 	case 0:
 		LOG_DBG("Neighbor cell data encoded successfully");
-		data_send(DATA_EVT_NEIGHBOR_CELLS_DATA_SEND, NEIGHBOR_CELLS, &codec);
+		data_send(NEIGHBOR_CELLS, &codec);
 		break;
 	case -ENOTSUP:
 		/* Neighbor cell data encoding not supported */
@@ -592,7 +460,7 @@ static void data_encode(void)
 	switch (err) {
 	case 0:
 		LOG_DBG("Data encoded successfully");
-		data_send(DATA_EVT_DATA_SEND, GENERIC, &codec);
+		data_send(GENERIC, &codec);
 		break;
 	case -ENODATA:
 		/* This error might occur when data has not been obtained prior
@@ -622,7 +490,7 @@ static void data_encode(void)
 	switch (err) {
 	case 0:
 		LOG_DBG("Batch data encoded successfully");
-		data_send(DATA_EVT_DATA_SEND_BATCH, BATCH, &codec);
+		data_send(BATCH, &codec);
 		break;
 	case -ENODATA:
 		LOG_DBG("No batch data to encode, ringbuffers are empty");
@@ -693,7 +561,7 @@ static int agps_request_encode(struct nrf_modem_gnss_agps_data_frame *incoming_r
 	switch (err) {
 	case 0:
 		LOG_DBG("A-GPS request encoded successfully");
-		data_send(DATA_EVT_AGPS_REQUEST_DATA_SEND, AGPS_REQUEST, &codec);
+		data_send(AGPS_REQUEST, &codec);
 		break;
 	case -ENOTSUP:
 		LOG_WRN("Encoding of A-GPS requests are not supported by the configured codec");
@@ -720,7 +588,6 @@ static void config_send(void)
 {
 	int err;
 	struct cloud_codec_data codec;
-	struct data_module_event *evt;
 
 	err = cloud_codec_encode_config(&codec, &current_cfg);
 	if (err) {
@@ -729,20 +596,12 @@ static void config_send(void)
 		return;
 	}
 
-	evt = new_data_module_event();
-	evt->type = DATA_EVT_CONFIG_SEND;
-	evt->data.buffer.buf = codec.buf;
-	evt->data.buffer.len = codec.len;
-
-	data_list_add_pending(codec.buf, codec.len, CONFIG);
-	EVENT_SUBMIT(evt);
-
+	data_send(CONFIG, &codec);
 }
 
 static void data_ui_send(void)
 {
 	int err;
-	struct data_module_event *evt;
 	struct cloud_codec_data codec = {0};
 
 	if (!date_time_is_valid()) {
@@ -763,14 +622,7 @@ static void data_ui_send(void)
 		return;
 	}
 
-	evt = new_data_module_event();
-	evt->type = DATA_EVT_UI_DATA_SEND;
-	evt->data.buffer.buf = codec.buf;
-	evt->data.buffer.len = codec.len;
-
-	data_list_add_pending(codec.buf, codec.len, UI);
-
-	EVENT_SUBMIT(evt);
+	data_send(UI, &codec);
 }
 
 static void requested_data_clear(void)
@@ -1026,8 +878,6 @@ static void on_cloud_state_disconnected(struct data_msg_data *msg)
 static void on_cloud_state_connected(struct data_msg_data *msg)
 {
 	if (IS_EVENT(msg, data, DATA_EVT_DATA_READY)) {
-		/* Resend data previously failed to be sent. */
-		data_resend();
 		data_encode();
 		return;
 	}
@@ -1321,8 +1171,8 @@ static void on_all_states(struct data_msg_data *msg)
 	}
 
 	if (IS_EVENT(msg, cloud, CLOUD_EVT_DATA_ACK)) {
-		data_ack(msg->module.cloud.data.ack.ptr,
-			 msg->module.cloud.data.ack.sent);
+		k_free(msg->module.cloud.data.ack.ptr);
+		LOG_WRF("Data freed: %p", msg->module.cloud.data.ack.ptr);
 	}
 }
 

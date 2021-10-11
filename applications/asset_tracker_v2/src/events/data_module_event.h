@@ -15,6 +15,7 @@
 
 #include "event_manager.h"
 #include "cloud/cloud_codec/cloud_codec.h"
+#include "qos.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,24 +25,13 @@ extern "C" {
 enum data_module_event_type {
 	DATA_EVT_DATA_READY,
 	DATA_EVT_DATA_SEND,
-	DATA_EVT_DATA_SEND_BATCH,
-	DATA_EVT_UI_DATA_SEND,
 	DATA_EVT_UI_DATA_READY,
-	DATA_EVT_NEIGHBOR_CELLS_DATA_SEND,
-	DATA_EVT_AGPS_REQUEST_DATA_SEND,
 	DATA_EVT_CONFIG_INIT,
 	DATA_EVT_CONFIG_READY,
-	DATA_EVT_CONFIG_SEND,
 	DATA_EVT_CONFIG_GET,
 	DATA_EVT_SHUTDOWN_READY,
 	DATA_EVT_DATE_TIME_OBTAINED,
 	DATA_EVT_ERROR
-};
-
-/** Struct containing pointer to array of data elements. */
-struct data_module_data_buffers {
-	char *buf;
-	size_t len;
 };
 
 /** @brief Data event. */
@@ -50,9 +40,12 @@ struct data_module_event {
 	enum data_module_event_type type;
 
 	union {
-		struct data_module_data_buffers buffer;
+		/** Struct containing data that is to be published to cloud. */
+		struct qos_data message;
+		/** Application configuration used to distribute new configurations to
+		 *  other modules.
+		 */
 		struct cloud_data_cfg cfg;
-		struct cloud_data_ui ui;
 		/* Module ID, used when acknowledging shutdown requests. */
 		uint32_t id;
 		int err;
