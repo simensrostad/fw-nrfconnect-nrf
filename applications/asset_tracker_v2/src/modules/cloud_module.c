@@ -264,22 +264,17 @@ static void agps_data_handle(const uint8_t *buf, size_t len)
 
 static void qos_event_handler(const struct qos_evt *const evt)
 {
-
 	switch (evt->type) {
-	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_GENERIC:
-
+	case QOS_EVT_MESSAGE_NEW:
+		send_data_ack(evt->message.buf, evt->message.len);
+		/* Before data is sent there must be performed a CONEVAL directly from the
+		 * cloud module. Based on the result of the CONEVAL a message is either sent or
+		 * ignored until the timeout for that message again occurs.
+		 */
 		break;
-	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_BATCH:
+	case QOS_EVT_MESSAGE_TIMER_EXPIRED:
 		break;
-	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_UI:
-		break;
-	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_NEIGHBOR_CELLS:
-		break;
-	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_AGPS_REQUEST:
-		break;
-	case QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED_CONFIG:
-		break;
-	case QOS_EVT_MESSAGE_ACKED:
+	case QOS_EVT_MESSAGE_REMOVED_FROM_LIST:
 		/* Send pointer and length to data module to be freed. */
 		send_data_ack(evt->message.buf, evt->message.len);
 		break;

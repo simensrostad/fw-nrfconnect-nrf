@@ -10,6 +10,10 @@ menuconfig QOS
 
 if QOS
 
+choice QOS_PERIODIC_BACKOFF_PERIOD
+	prompt "Periodice backoff period"
+	default QOS_PERIODIC_BACKOFF_PERIOD_NORMAL
+
 config QOS_PENDING_MESSAGES_MAX
 	int "Maximum amount of pending messages"
 	default 10

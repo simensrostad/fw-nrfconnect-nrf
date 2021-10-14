@@ -375,7 +375,7 @@ static void data_send(enum qos_data_type type, struct cloud_codec_data *data)
 	/* Set priority and reliability based on content of the packet to be sent */
 	switch (type) {
 	case GENERIC:
-		module_event->data.message.reliability = QOS_RELIABILITY_NO_ACK;
+		module_event->data.message.reliability = QOS_RELIABILITY_ACK_DISABLED;
 		module_event->data.message.priority = QOS_PRIORITY_LOW;
 		break;
 	case BATCH:
@@ -387,7 +387,7 @@ static void data_send(enum qos_data_type type, struct cloud_codec_data *data)
 		module_event->data.message.priority = QOS_PRIORITY_HIGH;
 		break;
 	case NEIGHBOR_CELLS:
-		module_event->data.message.reliability = QOS_RELIABILITY_NO_ACK;
+		module_event->data.message.reliability = QOS_RELIABILITY_ACK_DISABLED;
 		module_event->data.message.priority = QOS_PRIORITY_LOW;
 		break;
 	case AGPS_REQUEST:
@@ -401,7 +401,7 @@ static void data_send(enum qos_data_type type, struct cloud_codec_data *data)
 	default:
 		LOG_WRN("No data type associated with this packet, assume generic packet and "
 			"low priority");
-		module_event->data.message.reliability = QOS_RELIABILITY_NO_ACK;
+		module_event->data.message.reliability = QOS_RELIABILITY_ACK_DISABLED;
 		module_event->data.message.priority = QOS_PRIORITY_LOW;
 		break;
 	}

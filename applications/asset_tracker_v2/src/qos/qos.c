@@ -11,17 +11,17 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(qos, CONFIG_QOS_LOG_LEVEL);
 
-/* Lookup table for backoff reconnection to cloud. Binary scaling.
+/* Lookup table for backoff reconnection to cloud.
  *
  * comment: We could provide Kconfig options here to be able to set different retransmission logics
- * 	    - Aggressive retransmission
- *          - Moderate retransmission
- *          - Relaxed retransmissions
+ * 	    - Aggressive
+ *          - Moderate
+ *          - Relaxed
  *
- * Alternatively we cloud provide a run time option to switch between retransmission schemas so
- * that this can be controlled depending on network conditions.
+ * 	    Alternatively we cloud provide a run time option to switch between
+ *          retransmission schemas so that this can be controlled depending on network conditions.
  */
-struct ack_retrans_delay_lookup {
+struct ack_backoff_delay_lookup {
 	uint32_t delay;
 } backoff_delay[] = {
 	{ 2048 }, { 4096 }, { 8192 }, { 16384 }, { 32768 },
@@ -29,11 +29,13 @@ struct ack_retrans_delay_lookup {
 };
 
 struct qos_metadata {
-	/** Data to be sent to cloud*/
-	struct qos_data data;
-	/** ID used to uniquely identify the packet. */
+	/** Message */
+	struct qos_data message;
+	/** ID used to uniquely identify the message. */
 	uint16_t id;
-	/** Number of times the message has been retransmitted. Used to index backoff delay. */
+	/** Number of times the message retransmission has been invoked by the library.
+	 *  Used to index backoff delay.
+	 */
 	uint8_t retry_count;
 	/** Timer associated with the message. */
 	struct k_timer timer
@@ -53,9 +55,17 @@ static void qos_notify_event(const struct qos_evt *evt)
 static void ack_timeout_handler(struct k_timer *timer)
 {
 	/* I wonder whats acceptable in terms of processing here. */
-
 	/* The k_timer structure provides a pointer to user data.*/
-	/* */
+
+	/* Access user data entry that references message that will should be retransmitted. */
+	/* Propagate event QOS_EVT_MESSAGE_TIMER_EXPIRED with a reference to that entry in the
+	 * internal list.
+	 */
+
+	/* Keep the same handler for every message. Make it kconfigurable to send every message
+	 * if a timeout occurs. Consider only using one timer? This is slightly in conflict when
+	 * integrating with CONEVAL.
+	 */
 }
 
 void qos_init(qos_evt_handler_t evt_handler)
@@ -90,21 +100,11 @@ int qos_message_add(const struct qos_data *message)
 
 }
 
-int qos_message_acked(const struct qos_data *message)
-{
-	/* Remove message from list
-	 *
-	 * Stop timer associated timer
-	 * Propagate event QOS_EVT_MESSAGE_ACKED
-	 *
-	 */
-}
-
 int qos_message_remove(const struct qos_data *message)
 {
 	/* Remove message from list
 	 *
-	 * Stop timer associated timer
+	 * Stop timer associated timer if running.
 	 * Propagate event QOS_EVT_MESSAGE_REMOVED_FROM_LIST
 	 *
 	 */

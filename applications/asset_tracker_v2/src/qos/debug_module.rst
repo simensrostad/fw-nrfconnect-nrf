@@ -25,6 +25,13 @@ How to handle CONEVAL, two options:
 	CONFIG: Not important, the application has applied the config. Should be sent when energy costs are low.
 
  - Minimum energy level is passed in as metadata in structure qos_data.
-   When the callback QOS_EVT_MESSAGE_NEW or QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED is notified in the
+   When the callback QOS_EVT_MESSAGE_NEW or QOS_EVT_MESSAGE_TIMER_EXPIRED is notified in the
    cloud module the cloud module checks if the current energy level is sufficient. If not,
    the message is sendt to the qos library via qos_message_add.
+
+
+minimum values for different priority messages.
+- low: - reduced, efficient
+- normal: - normal
+- high: - increased
+- alert: - excessive

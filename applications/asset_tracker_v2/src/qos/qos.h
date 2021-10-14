@@ -6,7 +6,7 @@
 
 /**@file
  *
- * @brief   QoS library for Asset Tracker v2
+ * @brief   QoS library
  */
 
 #ifndef QOS_H__
@@ -18,59 +18,89 @@
 extern "C" {
 #endif
 
+/**
+ * @defgroup qos_flag_bitmask QoS library bitmask values
+ *
+ * @brief Use these bitmask values to enable different QoS message flags.
+ *
+ * @details The values can be OR'ed together to enable multiple flags at the same time. If a
+ *          systems bit is 0, the corresponding system is disabled.
+ * @{
+ */
+
+/** @brief Set this flag to disable acknowleding of the message. */
+#define QOS_FLAG_RELIABILITY_ACK_DISABLED 0x01;
+
+/**
+ * @brief Set this flag to require acknowledging of the message.
+ *
+ * @details By setting this flag the caller will be notified periodically with the
+ * 	    QOS_EVT_MESSAGE_TIMER_EXPIRED event until qos_message_remove() has been called with
+ *	    the corresponding message. The periodic backoff schemas is configures via the
+ *	    CONFIG_QOS_PERIODIC_BACKOFF_PERIOD Kconfig option.
+ */
+#define QOS_FLAG_RELIABILITY_ACK_REQUIRED 0x02;
+
+/**
+ * @brief Set this flag for low priority messages.
+ *
+ * @details Low priority messages should be
+ */
+#define QOS_FLAG_PRIORITY_LOW 0x03;
+
+/**
+ * @brief
+ *
+ * @details
+ */
+#define QOS_FLAG_PRIORITY_NORMAL 0x04;
+
+/**
+ * @brief
+ *
+ * @details
+ */
+#define QOS_FLAG_PRIORITY_HIGH 0x05;
+
+/**
+ * @brief
+ *
+ * @details
+ */
+#define QOS_FLAG_PRIORITY_ALRAM 0x06;
+
+/** @} */
+
 enum qos_evt_type {
+
 	/** A new message is ready. */
 	QOS_EVT_MESSAGE_NEW,
+
 	/** Retransmission timer has expired for a message.
 	 *  Payload is of type  @ref qos_data.
 	 *
-	 *  The structure contains the data type so that it can be addressed to the
-	 *  correct endpoint.
+	 *  comment: The structure contains the data type so that it can be addressed to the
+	 *           correct endpoint.
+	 *
+	 *  comment: We could even have one event, QOS_EVT_MESSAGE_READY instead of both
+	 *	     QOS_EVT_MESSAGE_TIMER_EXPIRED and QOS_EVT_MESSAGE_NEW
 	 *
 	 */
-	QOS_EVT_MESSAGE_ACK_TIMER_EXPIRED,
-	/** Message has been ACKed. If the memory_allocated flag is set in the payload the
-	 *  corresponding buffer must be freed.
-	 *  Payload is of type  @ref qos_data
-	 */
-	QOS_EVT_MESSAGE_ACKED,
+	QOS_EVT_MESSAGE_TIMER_EXPIRED,
 
-	/** Event received when the internal list is full or message has been explicitly removed
-	 *  from the internal list. If the memory_allocated flag is set in the payload the
-	 *  corresponding buffer must be freed.
+	/** Event received when the internal list is full or message has been removed
+	 *  from the internal list using qos_message_remove. If the heap_allocated flag is
+	 *  set in the payload the corresponding buffer must be freed.
 	 *  Payload is of type  @ref qos_data.
 	 */
 	QOS_EVT_MESSAGE_REMOVED_FROM_LIST
 };
 
-/* Enum signifying the realiabilty level of the message. */
-enum qos_reliability {
-	/** This option requires that the message is not ACKed. */
-	QOS_RELIABILITY_NO_ACK,
-	/** This option requires that the message should be ACKed. By specifying this option
-	 *  the message will be retransmitted with a backoff in case its not ACKed.
-	 */
-	QOS_RELIABILITY_ACK_REQUIRED,
-};
-
-// /** Enum used to specify the priority of the message. Higher priority message must be sent
-//  *  regardless. High priority messages will be
-//  *
-//  * comment: Setting a high priority of a message means that it will be sent by the cloud module
-//  *          no matter what the current lte connection
-//  *
-//  * I wonder if this option is nessecary. If its up to the cloud module to send messages based on
-//  * the type of the message.
-//  *
-//  */
-// enum qos_energy_consumption_min {
-// 	/** If this option is set the message has lower priority */
-// 	QOS_PRIORITY_LOW,
-// 	/** If this option is set the message has higher priority */
-// 	QOS_PRIORITY_HIGH,
-// };
-
-/** Enum used to identify the type of data in the message. */
+/** Enum used to identify the type of data in the message.
+ *
+ *  Comment: Could be possible to use xmacro here to generate the list run-time to avoid
+ *           application specific hard-coded types.
+ */
 enum qos_data_type {
 	UNUSED,
 	/** Genric data type. */
@@ -93,20 +123,14 @@ struct qos_data {
 	uint8_t *buf;
 	/** Length of data. */
 	size_t len;
-	/** Reliability of the message. */
-	enum qos_reliability reliability;
-	// /** Priority of the message. */
-	// enum qos_priority priority;
-	/** Type of data to be sent, used to address data to correct endpoint. */
+	/** Flags associated with the message.
+	 *  see @ref qos_flag_bitmask for documentation on the various flags that can be set.
+	*/
+	uint32_t qos_flags;
+	/** Type of data to be sent. */
 	enum qos_data_type type;
-	/** Flag signifying if the data has been allocated.
-	 *
-	 * comment: I'm not sure if this flag is needed. The fact that we handle pointer to
-	 * the buffer implicitly states that data has been allocated somewhere. Maybe rename it
-	 * to needs_free or something more instructive?
-	 *
-	 */
-	bool memory_allocated;
+	/** Flag signifying if the data has been allocated by the caller. */
+	bool heap_allocated;
 };
 
 struct qos_evt {
@@ -129,21 +153,22 @@ int qos_init(qos_evt_handler_t evt_handler);
 /** @brief Add message to internal list of messages to be sent.
  *
  *  @param message Pointer to message
+ *
+ *  @retval -EINVAL
+ *  @retval -EBADMSG
+ *  @retval -EFAULT
  */
 int qos_message_add(const struct qos_data *message);
 
-/** @brief A message has been ACKed. If the message has the memory_allocated flag set an event
- *        QOS_EVT_MESSAGE_ACKED will be sent out that contains the data to be freed.
- *
- *  @param message Pointer to message
- */
-int qos_message_acked(const struct qos_data *message);
-
-/** @brief Explicity remove message from internal list. If the list item has the memory allocated
+/** @brief Remove message from internal list. If the list item has the memory allocated
  *         flag set, an event QOS_EVT_MESSAGE_REMOVED_FROM_LIST will be sent out that contains
  *         the data item that must be freed.
  *
  *  @param message Pointer to message
+ *
+ *  @retval -EINVAL
+ *  @retval -EBADMSG
+ *  @retval -EFAULT
  */
 int qos_message_remove(const struct qos_data *message);
 
@@ -152,7 +177,3 @@ int qos_message_remove(const struct qos_data *message);
 #endif
 
 #endif /* QOS_H__ */
-
-/* qos_message_add and qos_message_acked basically does the same thing. We could remove the
- * concept of ACK and cloud related concepts and make it as generic as possible.
- */
