@@ -165,8 +165,10 @@ struct cloud_data_modem_dynamic {
 	int16_t rsrp;
 	/** Internet Protocol Address. */
 	char ip[INET6_ADDRSTRLEN];
-	/* Mobile Country Code*/
+	/* Mobile Country Code */
 	char mccmnc[7];
+	/* LTE mode */
+	enum lte_lc_lte_mode lte_mode;
 	/** Flag signifying that the data entry is to be encoded. */
 	bool queued : 1;
 

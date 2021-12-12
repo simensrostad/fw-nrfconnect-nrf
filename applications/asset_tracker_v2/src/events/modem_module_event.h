@@ -91,7 +91,6 @@ struct modem_module_edrx {
 
 struct modem_module_static_modem_data {
 	int64_t timestamp;
-	uint16_t band;
 	uint16_t nw_mode_gps;
 	uint16_t nw_mode_ltem;
 	uint16_t nw_mode_nbiot;
@@ -102,12 +101,14 @@ struct modem_module_static_modem_data {
 };
 
 struct modem_module_dynamic_modem_data {
+	uint16_t band;
 	int64_t timestamp;
 	uint16_t area_code;
 	uint32_t cell_id;
 	int16_t rsrp;
 	char ip_address[INET6_ADDRSTRLEN];
 	char mccmnc[7];
+	enum lte_lc_lte_mode lte_mode;
 
 	/* Flags to signify if the corresponding data value has been updated and is concidered
 	 * fresh.
@@ -117,6 +118,8 @@ struct modem_module_dynamic_modem_data {
 	bool rsrp_fresh		: 1;
 	bool ip_address_fresh	: 1;
 	bool mccmnc_fresh	: 1;
+	bool lte_mode_fresh	: 1;
+	bool band_fresh		: 1;
 };
 
 struct modem_module_battery_data {

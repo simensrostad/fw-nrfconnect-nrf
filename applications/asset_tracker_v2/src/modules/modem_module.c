@@ -61,6 +61,9 @@ static struct modem_param_info modem_param;
 
 /* Value that always holds the latest RSRP value. */
 static int16_t rsrp_value_latest;
+/* Enum that maintains the latest LTE mode reported by the modem. */
+static enum lte_lc_lte_mode lte_mode_latest;
+
 const k_tid_t module_thread;
 
 /* Modem module message queue. */
@@ -223,6 +226,11 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 		} else {
 			LOG_DBG("Neighbor cell measurement was not successful");
 		}
+	case LTE_LC_EVT_LTE_MODE_UPDATE:
+		LOG_DBG("LTE mode update: %s",
+				(evt->lte_mode == LTE_LC_LTE_MODE_NBIOT) ? "NB-IoT" :
+				(evt->lte_mode == LTE_LC_LTE_MODE_LTEM) ? "LTE-M"  : "NONE");
+		lte_mode_latest = evt->lte_mode;
 		break;
 	default:
 		break;
