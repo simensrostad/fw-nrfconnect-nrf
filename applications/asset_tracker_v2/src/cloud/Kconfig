@@ -8,6 +8,9 @@ if AZURE_IOT_HUB && AZURE_FOTA
 rsource "Kconfig.azure_fota_patch"
 endif
 
+config AVSYSTEM_INTEGRATION
+        bool "AVsystem integration layer"
+
 module = CLOUD_INTEGRATION
 module-str = Cloud integration layer
 source "subsys/logging/Kconfig.template.log_config"

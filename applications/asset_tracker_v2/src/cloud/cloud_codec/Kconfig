@@ -15,6 +15,7 @@ choice
 	default CLOUD_CODEC_NRF_CLOUD if NRF_CLOUD_MQTT
 	default CLOUD_CODEC_AWS_IOT if AWS_IOT
 	default CLOUD_CODEC_AZURE_IOT_HUB if AZURE_IOT_HUB
+	default CLOUD_CODEC_AWS_IOT if AVSYSTEM_INTEGRATION
 
 config CLOUD_CODEC_NRF_CLOUD
 	bool "Enable nRF Cloud codec backend"
