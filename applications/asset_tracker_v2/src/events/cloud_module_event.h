@@ -80,8 +80,6 @@ struct cloud_module_data_ack {
 	void *ptr;
 	/** Length of data that was attempted to be sent. */
 	size_t len;
-	/* Flag to signify if the data was sent or not. */
-	bool sent;
 };
 
 /** @brief Cloud module event. */

@@ -275,7 +275,13 @@ int cloud_wrap_disconnect(void)
 	return 0;
 }
 
-int cloud_wrap_state_send(char *buf, size_t len)
+int cloud_wrap_state_get(void)
+{
+	/* Not supported by nRF Cloud */
+	return 0;
+}
+
+int cloud_wrap_config_send(char *buf, size_t len)
 {
 	int err;
 	struct nrf_cloud_tx_data msg = {

@@ -17,12 +17,6 @@ static char *get_evt_type_str(enum data_module_event_type type)
 		return "DATA_EVT_DATA_READY";
 	case DATA_EVT_DATA_SEND_BATCH:
 		return "DATA_EVT_DATA_SEND_BATCH";
-	case DATA_EVT_UI_DATA_READY:
-		return "DATA_EVT_UI_DATA_READY";
-	case DATA_EVT_UI_DATA_SEND:
-		return "DATA_EVT_UI_DATA_SEND";
-	case DATA_EVT_NEIGHBOR_CELLS_DATA_SEND:
-		return "DATA_EVT_NEIGHBOR_CELLS_DATA_SEND";
 	case DATA_EVT_AGPS_REQUEST_DATA_SEND:
 		return "DATA_EVT_AGPS_REQUEST_DATA_SEND";
 	case DATA_EVT_CONFIG_INIT:

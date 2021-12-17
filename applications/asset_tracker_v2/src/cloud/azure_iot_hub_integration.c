@@ -362,7 +362,7 @@ int cloud_wrap_state_get(void)
 	return 0;
 }
 
-int cloud_wrap_state_send(char *buf, size_t len)
+int cloud_wrap_config_send(char *buf, size_t len)
 {
 	int err;
 	struct azure_iot_hub_data msg = {

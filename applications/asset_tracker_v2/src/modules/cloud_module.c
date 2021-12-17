@@ -32,6 +32,8 @@
 #include "events/modem_module_event.h"
 #include "events/gnss_module_event.h"
 #include "events/debug_module_event.h"
+#include "events/sensor_module_event.h"
+#include "events/ui_module_event.h"
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(MODULE, CONFIG_CLOUD_MODULE_LOG_LEVEL);
@@ -53,6 +55,8 @@ struct cloud_msg_data {
 		struct util_module_event util;
 		struct gnss_module_event gnss;
 		struct debug_module_event debug;
+		struct sensor_module_event sensor;
+		struct ui_module_event ui;
 	} module;
 };
 
@@ -224,6 +228,20 @@ static bool event_handler(const struct event_header *eh)
 		enqueue_msg = true;
 	}
 
+	if (is_sensor_module_event(eh)) {
+		struct sensor_module_event *evt = cast_sensor_module_event(eh);
+
+		msg.module.sensor = *evt;
+		enqueue_msg = true;
+	}
+
+	if (is_ui_module_event(eh)) {
+		struct ui_module_event *evt = cast_ui_module_event(eh);
+
+		msg.module.ui = *evt;
+		enqueue_msg = true;
+	}
+
 	if (enqueue_msg) {
 		int err = module_enqueue_msg(&self, &msg);
 
@@ -386,23 +404,6 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 }
 
 /* Static module functions. */
-static void send_data_ack(void *ptr, size_t len, bool sent)
-{
-	struct cloud_module_event *cloud_module_event =
-			new_cloud_module_event();
-
-	if (len < 0) {
-		LOG_WRN("Data to be ACKen has zero length");
-		return;
-	}
-
-	cloud_module_event->type = CLOUD_EVT_DATA_ACK;
-	cloud_module_event->data.ack.ptr = ptr;
-	cloud_module_event->data.ack.sent = sent;
-	cloud_module_event->data.ack.len = len;
-
-	EVENT_SUBMIT(cloud_module_event);
-}
 
 static void send_config_received(void)
 {
@@ -415,28 +416,34 @@ static void send_config_received(void)
 	EVENT_SUBMIT(cloud_module_event);
 }
 
-static void data_send(struct data_module_event *evt)
+static void data_send(void)
 {
 	int err;
 
-	err = cloud_wrap_data_send(evt->data.buffer.buf, evt->data.buffer.len);
+	err = cloud_wrap_neighbor_cells_send();
 	if (err) {
 		LOG_ERR("cloud_wrap_data_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf,
-			      evt->data.buffer.len,
-			      false);
 		return;
 	}
 
-	LOG_DBG("Data sent, data pointer: %p", evt->data.buffer.buf);
+	err = cloud_wrap_data_send();
+	if (err) {
+		LOG_ERR("cloud_wrap_data_send, err: %d", err);
+		return;
+	}
 
-	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
+	err = cloud_wrap_batch_send();
+	if (err) {
+		LOG_ERR("cloud_wrap_batch_send, err: %d", err);
+		return;
+	}
 }
 
 static void memfault_data_send(struct debug_module_event *evt)
 {
 	int err;
 
+	/* Memfault data needs to be forwarded directly. */
 	err = cloud_wrap_memfault_data_send(evt->data.memfault.buf, evt->data.memfault.len);
 	if (err) {
 		LOG_ERR("cloud_wrap_memfault_data_send, err: %d", err);
@@ -450,18 +457,13 @@ static void config_send(struct data_module_event *evt)
 {
 	int err;
 
-	err = cloud_wrap_state_send(evt->data.buffer.buf, evt->data.buffer.len);
+	err = cloud_wrap_config_send(&evt->data.cfg);
 	if (err) {
-		LOG_ERR("cloud_wrap_state_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf,
-			      evt->data.buffer.len,
-			      false);
+		LOG_ERR("cloud_wrap_config_send, err: %d", err);
 		return;
 	}
 
-	LOG_DBG("Configuration sent, data pointer: %p", evt->data.buffer.buf);
-
-	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
+	LOG_DBG("Configuration sent");
 }
 
 static void config_get(void)
@@ -478,96 +480,21 @@ static void config_get(void)
 	}
 }
 
-static void batch_data_send(struct data_module_event *evt)
-{
-	int err;
-
-	err = cloud_wrap_batch_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err) {
-		LOG_ERR("cloud_wrap_batch_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf,
-			      evt->data.buffer.len,
-			      false);
-		return;
-	}
-
-	LOG_DBG("Batch sent, data pointer: %p", evt->data.buffer.buf);
-
-	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-}
-
-static void ui_data_send(struct data_module_event *evt)
-{
-	int err;
-
-	err = cloud_wrap_ui_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err) {
-		LOG_ERR("cloud_wrap_ui_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf,
-			      evt->data.buffer.len,
-			      false);
-		return;
-	}
-
-	LOG_DBG("UI sent, data pointer: %p", evt->data.buffer.buf);
-
-	send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-}
-
-static void neighbor_cells_data_send(struct data_module_event *evt)
-{
-	int err;
-
-	err = cloud_wrap_neighbor_cells_send(evt->data.buffer.buf, evt->data.buffer.len);
-	if (err == -ENOTSUP) {
-		LOG_DBG("Sending of neighbor cell data is not supported by the "
-			"configured cloud library");
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-	} else if (err) {
-		LOG_ERR("cloud_wrap_neighbor_cells_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, false);
-	} else {
-		LOG_DBG("Neighbor cell data sent, data pointer: %p", evt->data.buffer.buf);
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
-	}
-}
-
 static void agps_data_request_send(struct data_module_event *evt)
 {
 	int err;
 
-	err = cloud_wrap_agps_request_send(evt->data.buffer.buf, evt->data.buffer.len);
+	err = cloud_wrap_agps_request_send(&evt->data.agps_request);
 	if (err == -ENOTSUP) {
 		LOG_DBG("Sending of A-GPS request is not supported by the "
 			"configured cloud library");
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
 	} else if (err) {
 		LOG_ERR("cloud_wrap_agps_request_send, err: %d", err);
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, false);
+		SEND_ERROR(cloud, DATA_EVT_ERROR, err);
 	} else {
-		LOG_DBG("A-GPS request sent, data pointer: %p", evt->data.buffer.buf);
-		send_data_ack(evt->data.buffer.buf, evt->data.buffer.len, true);
+		LOG_DBG("A-GPS request sent");
 	}
 }
-
-#if defined(CONFIG_NRF_CLOUD_PGPS)
-static void pgps_request_send(struct cloud_codec_data *data)
-{
-	int err;
-
-	err = cloud_wrap_pgps_request_send(data->buf, data->len);
-	cloud_codec_release_data(data);
-
-	if (err == -ENOTSUP) {
-		LOG_DBG("Sending of P-GPS request is not supported by the "
-			"configured cloud library");
-	} else if (err) {
-		LOG_ERR("cloud_wrap_pgps_request_send, err: %d", err);
-	} else {
-		LOG_DBG("P-GPS request sent");
-	}
-}
-#endif
 
 static void connect_cloud(void)
 {
@@ -642,8 +569,6 @@ void pgps_handler(struct nrf_cloud_pgps_event *event)
 	case PGPS_EVT_REQUEST: {
 		LOG_DBG("PGPS_EVT_REQUEST");
 
-		/* Encode and send P-GPS request to cloud. */
-		struct cloud_codec_data output = {0};
 		struct cloud_data_pgps_request request = {
 			.count = event->request->prediction_count,
 			.interval = event->request->prediction_period_min,
@@ -652,24 +577,15 @@ void pgps_handler(struct nrf_cloud_pgps_event *event)
 			.queued = true,
 		};
 
-		err = cloud_codec_encode_pgps_request(&output, &request);
-		switch (err) {
-		case 0:
-			LOG_DBG("P-GPS request encoded successfully");
-
-			/* This function frees the allocated JSON string buffer */
-			pgps_request_send(&output);
-			break;
-		case -ENOTSUP:
-			/* PGPS request encoding is not supported */
-			break;
-		case -ENODATA:
-			LOG_DBG("No P-GPS data to encode, error: %d", err);
-			break;
-		default:
-			LOG_ERR("Error encoding P-GPS request: %d", err);
-			SEND_ERROR(data, DATA_EVT_ERROR, err);
-			return;
+		err = cloud_wrap_pgps_request_send(&request);
+		if (err == -ENOTSUP) {
+			LOG_DBG("Sending of P-GPS request is not supported by the "
+				"configured cloud library");
+		} else if (err) {
+			LOG_ERR("cloud_wrap_pgps_request_send, err: %d", err);
+			SEND_ERROR(cloud, DATA_EVT_ERROR, err);
+		} else {
+			LOG_DBG("PGPS request sent");
 		}
 	}
 		break;
@@ -776,35 +692,27 @@ static void on_sub_state_cloud_connected(struct cloud_msg_data *msg)
 	}
 
 	if (IS_EVENT(msg, data, DATA_EVT_AGPS_REQUEST_DATA_SEND)) {
+		/* A-GPS data requests are handled directly */
 		agps_data_request_send(&msg->module.data);
 	}
 
 	if (IS_EVENT(msg, debug, DEBUG_EVT_MEMFAULT_DATA_READY)) {
+		/* Memfault data must be handled directly due, cannot be store*/
 		memfault_data_send(&msg->module.debug);
 	}
 
 	if (IS_EVENT(msg, data, DATA_EVT_DATA_SEND)) {
-		data_send(&msg->module.data);
+		/* Data and batch is retrived from internal buffers in intergration layers. */
+		data_send();
 	}
 
 	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_SEND)) {
+		/* Config needs to be handled directly */
 		config_send(&msg->module.data);
 	}
 
 	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_GET)) {
 		config_get();
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_DATA_SEND_BATCH)) {
-		batch_data_send(&msg->module.data);
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_UI_DATA_SEND)) {
-		ui_data_send(&msg->module.data);
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_NEIGHBOR_CELLS_DATA_SEND)) {
-		neighbor_cells_data_send(&msg->module.data);
 	}
 
 	/* To properly initialize the nRF Cloud PGPS library we need to be connected to cloud and
@@ -873,6 +781,178 @@ static void on_all_states(struct cloud_msg_data *msg)
 		memcpy(&agps_request, &msg->module.gnss.data.agps_request, sizeof(agps_request));
 	}
 #endif
+
+	if (IS_EVENT(msg, ui, UI_EVT_BUTTON_DATA_READY)) {
+		struct cloud_data_ui new_ui_data = {
+			.btn = msg->module.ui.data.ui.button_number,
+			.btn_ts = msg->module.ui.data.ui.timestamp,
+			.queued = true
+		};
+
+		cloud_codec_populate_ui_buffer(&new_ui_data);
+
+		int err = cloud_wrap_ui_send();
+
+		if (err) {
+			LOG_ERR("cloud_wrap_ui_send, err: %d", err);
+			return;
+		}
+
+		return;
+	}
+
+	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_READY)) {
+		struct cloud_data_modem_static modem_stat;
+
+		modem_stat.ts = msg->module.modem.data.modem_static.timestamp;
+		modem_stat.queued = true;
+
+		BUILD_ASSERT(sizeof(modem_stat.appv) >=
+			     sizeof(msg->module.modem.data.modem_static.app_version));
+
+		BUILD_ASSERT(sizeof(modem_stat.brdv) >=
+			     sizeof(msg->module.modem.data.modem_static.board_version));
+
+		BUILD_ASSERT(sizeof(modem_stat.fw) >=
+			     sizeof(msg->module.modem.data.modem_static.modem_fw));
+
+		BUILD_ASSERT(sizeof(modem_stat.iccid) >=
+			     sizeof(msg->module.modem.data.modem_static.iccid));
+
+		BUILD_ASSERT(sizeof(modem_stat.imei) >=
+			     sizeof(msg->module.modem.data.modem_static.imei));
+
+		strcpy(modem_stat.appv, msg->module.modem.data.modem_static.app_version);
+		strcpy(modem_stat.brdv, msg->module.modem.data.modem_static.board_version);
+		strcpy(modem_stat.fw, msg->module.modem.data.modem_static.modem_fw);
+		strcpy(modem_stat.iccid, msg->module.modem.data.modem_static.iccid);
+		strcpy(modem_stat.imei, msg->module.modem.data.modem_static.imei);
+
+		cloud_codec_populate_modem_static_buffer(&modem_stat);
+	}
+
+	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_DYNAMIC_DATA_READY)) {
+		struct cloud_data_modem_dynamic new_modem_data = {
+			.area = msg->module.modem.data.modem_dynamic.area_code,
+			.nw_mode = msg->module.modem.data.modem_dynamic.nw_mode,
+			.band = msg->module.modem.data.modem_dynamic.band,
+			.cell = msg->module.modem.data.modem_dynamic.cell_id,
+			.rsrp = msg->module.modem.data.modem_dynamic.rsrp,
+			.ts = msg->module.modem.data.modem_dynamic.timestamp,
+
+			.area_code_fresh = msg->module.modem.data.modem_dynamic.area_code_fresh,
+			.nw_mode_fresh = msg->module.modem.data.modem_dynamic.nw_mode_fresh,
+			.band_fresh = msg->module.modem.data.modem_dynamic.band_fresh,
+			.cell_id_fresh = msg->module.modem.data.modem_dynamic.cell_id_fresh,
+			.rsrp_fresh = msg->module.modem.data.modem_dynamic.rsrp_fresh,
+			.ip_address_fresh = msg->module.modem.data.modem_dynamic.ip_address_fresh,
+			.mccmnc_fresh = msg->module.modem.data.modem_dynamic.mccmnc_fresh,
+			.queued = true
+		};
+
+		BUILD_ASSERT(sizeof(new_modem_data.ip) >=
+			     sizeof(msg->module.modem.data.modem_dynamic.ip_address));
+
+		BUILD_ASSERT(sizeof(new_modem_data.mccmnc) >=
+			     sizeof(msg->module.modem.data.modem_dynamic.mccmnc));
+
+		strcpy(new_modem_data.ip, msg->module.modem.data.modem_dynamic.ip_address);
+		strcpy(new_modem_data.mccmnc, msg->module.modem.data.modem_dynamic.mccmnc);
+
+		cloud_codec_populate_modem_dynamic_buffer(&new_modem_data);
+	}
+
+	if (IS_EVENT(msg, modem, MODEM_EVT_BATTERY_DATA_READY)) {
+		struct cloud_data_battery new_battery_data = {
+			.bat = msg->module.modem.data.bat.battery_voltage,
+			.bat_ts = msg->module.modem.data.bat.timestamp,
+			.queued = true
+		};
+
+		cloud_codec_populate_bat_buffer(&new_battery_data);
+	}
+
+	if (IS_EVENT(msg, sensor, SENSOR_EVT_ENVIRONMENTAL_DATA_READY)) {
+		struct cloud_data_sensors new_sensor_data = {
+			.temperature = msg->module.sensor.data.sensors.temperature,
+			.humidity = msg->module.sensor.data.sensors.humidity,
+			.env_ts = msg->module.sensor.data.sensors.timestamp,
+			.queued = true
+		};
+
+		cloud_codec_populate_sensor_buffer(&new_sensor_data);
+	}
+
+	if (IS_EVENT(msg, sensor, SENSOR_EVT_MOVEMENT_DATA_READY)) {
+		struct cloud_data_accelerometer new_movement_data = {
+			.values[0] = msg->module.sensor.data.accel.values[0],
+			.values[1] = msg->module.sensor.data.accel.values[1],
+			.values[2] = msg->module.sensor.data.accel.values[2],
+			.ts = msg->module.sensor.data.accel.timestamp,
+			.queued = true
+		};
+
+		cloud_codec_populate_accel_buffer(&new_movement_data);
+	}
+
+	if (IS_EVENT(msg, gnss, GNSS_EVT_DATA_READY)) {
+		struct cloud_data_gnss new_gnss_data = {
+			.gnss_ts = msg->module.gnss.data.gnss.timestamp,
+			.queued = true,
+			.format = msg->module.gnss.data.gnss.format
+		};
+
+		switch (msg->module.gnss.data.gnss.format) {
+		case GNSS_MODULE_DATA_FORMAT_PVT: {
+			/* Add PVT data */
+			new_gnss_data.pvt.acc = msg->module.gnss.data.gnss.pvt.accuracy;
+			new_gnss_data.pvt.alt = msg->module.gnss.data.gnss.pvt.altitude;
+			new_gnss_data.pvt.hdg = msg->module.gnss.data.gnss.pvt.heading;
+			new_gnss_data.pvt.lat = msg->module.gnss.data.gnss.pvt.latitude;
+			new_gnss_data.pvt.longi = msg->module.gnss.data.gnss.pvt.longitude;
+			new_gnss_data.pvt.spd = msg->module.gnss.data.gnss.pvt.speed;
+
+		};
+			break;
+		case GNSS_MODULE_DATA_FORMAT_NMEA: {
+			/* Add NMEA data */
+			BUILD_ASSERT(sizeof(new_gnss_data.nmea) >=
+				     sizeof(msg->module.gnss.data.gnss.nmea));
+
+			strcpy(new_gnss_data.nmea, msg->module.gnss.data.gnss.nmea);
+		};
+			break;
+		case GNSS_MODULE_DATA_FORMAT_INVALID:
+			/* Fall through */
+		default:
+			LOG_WRN("Event does not carry valid GNSS data");
+			return;
+		}
+
+		cloud_codec_populate_gnss_buffer(&new_gnss_data);
+	}
+
+	if (IS_EVENT(msg, modem, MODEM_EVT_NEIGHBOR_CELLS_DATA_READY)) {
+		struct cloud_data_neighbor_cells neighbor_cells;
+
+		BUILD_ASSERT(sizeof(neighbor_cells.cell_data) ==
+			     sizeof(msg->module.modem.data.neighbor_cells.cell_data));
+
+		BUILD_ASSERT(sizeof(neighbor_cells.neighbor_cells) ==
+			     sizeof(msg->module.modem.data.neighbor_cells.neighbor_cells));
+
+		memcpy(&neighbor_cells.cell_data, &msg->module.modem.data.neighbor_cells.cell_data,
+		       sizeof(neighbor_cells.cell_data));
+
+		memcpy(&neighbor_cells.neighbor_cells,
+		       &msg->module.modem.data.neighbor_cells.neighbor_cells,
+		       sizeof(neighbor_cells.neighbor_cells));
+
+		neighbor_cells.ts = msg->module.modem.data.neighbor_cells.timestamp;
+		neighbor_cells.queued = true;
+
+		cloud_codec_populate_neighbor_cell_buffer(&neighbor_cells);
+	}
 }
 
 static void module_thread_fn(void)
@@ -941,4 +1021,6 @@ EVENT_SUBSCRIBE(MODULE, modem_module_event);
 EVENT_SUBSCRIBE(MODULE, cloud_module_event);
 EVENT_SUBSCRIBE(MODULE, gnss_module_event);
 EVENT_SUBSCRIBE(MODULE, debug_module_event);
+EVENT_SUBSCRIBE(MODULE, sensor_module_event);
+EVENT_SUBSCRIBE(MODULE, ui_module_event);
 EVENT_SUBSCRIBE_EARLY(MODULE, util_module_event);
