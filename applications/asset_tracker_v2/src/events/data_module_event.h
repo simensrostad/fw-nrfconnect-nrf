@@ -26,9 +26,7 @@ enum data_module_event_type {
 	DATA_EVT_DATA_READY,
 	DATA_EVT_DATA_SEND,
 	DATA_EVT_DATA_SEND_BATCH,
-	DATA_EVT_UI_DATA_SEND,
-	DATA_EVT_UI_DATA_READY,
-	DATA_EVT_NEIGHBOR_CELLS_DATA_SEND,
+	/* A-GPS data needs special care and cannot be sent directly to cloud module. */
 	DATA_EVT_AGPS_REQUEST_DATA_SEND,
 	DATA_EVT_CONFIG_INIT,
 	DATA_EVT_CONFIG_READY,
@@ -39,21 +37,16 @@ enum data_module_event_type {
 	DATA_EVT_ERROR
 };
 
-/** Struct containing pointer to array of data elements. */
-struct data_module_data_buffers {
-	char *buf;
-	size_t len;
-};
-
 /** @brief Data event. */
 struct data_module_event {
 	struct event_header header;
 	enum data_module_event_type type;
 
 	union {
-		struct data_module_data_buffers buffer;
+		struct cloud_data_neighbor_cells ncell;
 		struct cloud_data_cfg cfg;
 		struct cloud_data_ui ui;
+		struct cloud_data_agps_request agps_request;
 		/* Module ID, used when acknowledging shutdown requests. */
 		uint32_t id;
 		int err;

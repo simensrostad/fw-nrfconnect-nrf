@@ -3,6 +3,8 @@
 #include <net/aws_iot.h>
 #include <nrf_modem_at.h>
 
+#include <cloud_codec.h>
+
 #define MODULE aws_iot_integration
 
 #include <logging/log.h>
@@ -377,13 +379,61 @@ int cloud_wrap_state_get(void)
 	return 0;
 }
 
-int cloud_wrap_state_send(char *buf, size_t len)
+int cloud_wrap_config_send(struct cloud_data_cfg *config)
+{
+	// int err;
+
+	// struct aws_iot_data msg = {
+	// 	.ptr = buf,
+	// 	.len = len,
+	// 	.qos = MQTT_QOS_0_AT_MOST_ONCE,
+	// 	.topic.type = AWS_IOT_SHADOW_TOPIC_UPDATE,
+	// };
+
+	// err = aws_iot_send(&msg);
+	// if (err) {
+	// 	LOG_ERR("aws_iot_send, error: %d", err);
+	// 	return err;
+	// }
+
+	return 0;
+}
+
+int cloud_wrap_data_send(void)
 {
 	int err;
+	struct cloud_codec_data codec = { 0 };
+	struct cloud_data_modem_dynamic modem_dynamic = {0};
+	struct cloud_data_modem_static modem_static = {0};
+	struct cloud_data_gnss gnss = {0};
+	struct cloud_data_ui ui = {0};
+	struct cloud_data_accelerometer accelerometer = {0};
+	struct cloud_data_sensors sensors = {0};
+	struct cloud_data_battery battery = {0};
+
+	cloud_codec_retrieve_modem_dynamic_buffer(&modem_dynamic);
+	cloud_codec_retrieve_modem_static_buffer(&modem_static);
+	cloud_codec_retrieve_gnss_buffer(&gnss);
+	cloud_codec_retrieve_ui_buffer(&ui);
+	cloud_codec_retrieve_accelerometer_buffer(&accelerometer);
+	cloud_codec_retrieve_sensors_buffer(&sensors);
+	cloud_codec_retrieve_battery_buffer(&battery);
+
+	err = cloud_codec_encode_data(&codec,
+				      &gnss,
+				      &sensors,
+				      &modem_static,
+				      &modem_dynamic,
+				      &ui,
+				      &accelerometer,
+				      &battery);
+	if (err) {
+		LOG_ERR("cloud_codec_encode_data, error: %d", err);
+	}
 
 	struct aws_iot_data msg = {
-		.ptr = buf,
-		.len = len,
+		.ptr = codec.buf,
+		.len = codec.len,
 		.qos = MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AWS_IOT_SHADOW_TOPIC_UPDATE,
 	};
@@ -397,54 +447,65 @@ int cloud_wrap_state_send(char *buf, size_t len)
 	return 0;
 }
 
-int cloud_wrap_data_send(char *buf, size_t len)
+int cloud_wrap_batch_send(void)
 {
-	int err;
+	// int err;
 
-	struct aws_iot_data msg = {
-		.ptr = buf,
-		.len = len,
-		.qos = MQTT_QOS_0_AT_MOST_ONCE,
-		.topic.type = AWS_IOT_SHADOW_TOPIC_UPDATE,
-	};
+	// struct cloud_codec_data codec = { 0 };
 
-	err = aws_iot_send(&msg);
-	if (err) {
-		LOG_ERR("aws_iot_send, error: %d", err);
-		return err;
-	}
+	// err = cloud_codec_encode_batch_data(&codec, gps_buf, sensors_buf, modem_dyn_buf, ui_buf,
+	// 				    accel_buf, bat_buf, ARRAY_SIZE(gps_buf),
+	// 				    ARRAY_SIZE(sensors_buf), ARRAY_SIZE(modem_dyn_buf),
+	// 				    ARRAY_SIZE(ui_buf), ARRAY_SIZE(accel_buf),
+	// 				    ARRAY_SIZE(bat_buf));
+	// switch (err) {
+	// case 0:
+	// 	LOG_DBG("Batch data encoded successfully");
+	// 	data_send(DATA_EVT_DATA_SEND_BATCH, BATCH, &codec);
+	// 	break;
+	// case -ENODATA:
+	// 	LOG_DBG("No batch data to encode, ringbuffers are empty");
+	// 	break;
+	// default:
+	// 	LOG_ERR("Error batch-enconding data: %d", err);
+	// 	SEND_ERROR(data, DATA_EVT_ERROR, err);
+	// 	return;
+	// }
+
+	// struct aws_iot_data msg = {
+	// 	.ptr = buf,
+	// 	.len = len,
+	// 	.qos = MQTT_QOS_0_AT_MOST_ONCE,
+	// 	/* <imei>/batch */
+	// 	.topic = pub_topics[APP_PUB_TOPIC_IDX_BATCH]
+	// };
+
+	// err = aws_iot_send(&msg);
+	// if (err) {
+	// 	LOG_ERR("aws_iot_send, error: %d", err);
+	// 	return err;
+	// }
 
 	return 0;
 }
 
-int cloud_wrap_batch_send(char *buf, size_t len)
+int cloud_wrap_ui_send(void)
 {
 	int err;
+	struct cloud_codec_data codec = { 0 };
+	struct cloud_data_ui ui = { 0 };
 
-	struct aws_iot_data msg = {
-		.ptr = buf,
-		.len = len,
-		.qos = MQTT_QOS_0_AT_MOST_ONCE,
-		/* <imei>/batch */
-		.topic = pub_topics[APP_PUB_TOPIC_IDX_BATCH]
-	};
+	cloud_codec_retrieve_ui_buffer(&ui);
 
-	err = aws_iot_send(&msg);
+	err = cloud_codec_encode_ui_data(&codec, &ui);
 	if (err) {
-		LOG_ERR("aws_iot_send, error: %d", err);
+		LOG_ERR("cloud_codec_encode_neighbor_cells, error: %d", err);
 		return err;
 	}
 
-	return 0;
-}
-
-int cloud_wrap_ui_send(char *buf, size_t len)
-{
-	int err;
-
 	struct aws_iot_data msg = {
-		.ptr = buf,
-		.len = len,
+		.ptr = codec.buf,
+		.len = codec.len,
 		.qos = MQTT_QOS_0_AT_MOST_ONCE,
 		/* <imei>/messages */
 		.topic = pub_topics[APP_PUB_TOPIC_IDX_UI]
@@ -459,12 +520,22 @@ int cloud_wrap_ui_send(char *buf, size_t len)
 	return 0;
 }
 
-int cloud_wrap_neighbor_cells_send(char *buf, size_t len)
+int cloud_wrap_neighbor_cells_send(void)
 {
 	int err;
+	struct cloud_codec_data codec = { 0 };
+	struct cloud_data_neighbor_cells neighbor_cells = {0};
+
+	cloud_codec_retrieve_neighbor_cell_buffer(&neighbor_cells);
+
+	err = cloud_codec_encode_neighbor_cells(&codec, &neighbor_cells);
+	if (err) {
+		LOG_ERR("cloud_codec_encode_neighbor_cells, error: %d", err);
+	}
+
 	struct aws_iot_data msg = {
-		.ptr = buf,
-		.len = len,
+		.ptr = codec.buf,
+		.len = codec.len,
 		.qos = MQTT_QOS_0_AT_MOST_ONCE,
 		/* <imei>/ncellmeas */
 		.topic = pub_topics[APP_PUB_TOPIC_IDX_NEIGHBOR_CELLS]
@@ -479,12 +550,20 @@ int cloud_wrap_neighbor_cells_send(char *buf, size_t len)
 	return 0;
 }
 
-int cloud_wrap_agps_request_send(char *buf, size_t len)
+int cloud_wrap_agps_request_send(struct cloud_data_agps_request *request)
 {
 	int err;
+	struct cloud_codec_data codec = { 0 };
+
+	err = cloud_codec_encode_agps_request(&codec, request);
+	if (err) {
+		LOG_ERR("cloud_codec_encode_neighbor_cells, error: %d", err);
+		return err;
+	}
+
 	struct aws_iot_data msg = {
-		.ptr = buf,
-		.len = len,
+		.ptr = codec.buf,
+		.len = codec.len,
 		.qos = MQTT_QOS_0_AT_MOST_ONCE,
 		/* <imei>/agps/get */
 		.topic = pub_topics[APP_PUB_TOPIC_IDX_AGPS]
@@ -499,42 +578,45 @@ int cloud_wrap_agps_request_send(char *buf, size_t len)
 	return 0;
 }
 
-int cloud_wrap_pgps_request_send(char *buf, size_t len)
+int cloud_wrap_pgps_request_send(struct cloud_data_pgps_request *request)
 {
-	int err;
-	struct aws_iot_data msg = {
-		.ptr = buf,
-		.len = len,
-		.qos = MQTT_QOS_0_AT_MOST_ONCE,
-		/* <imei>/pgps/get */
-		.topic = pub_topics[APP_PUB_TOPIC_IDX_PGPS]
-	};
+	// int err;
+	// struct aws_iot_data msg = {
+	// 	.ptr = buf,
+	// 	.len = len,
+	// 	.qos = MQTT_QOS_0_AT_MOST_ONCE,
+	// 	/* <imei>/pgps/get */
+	// 	.topic = pub_topics[APP_PUB_TOPIC_IDX_PGPS]
+	// };
 
-	err = aws_iot_send(&msg);
-	if (err) {
-		LOG_ERR("aws_iot_send, error: %d", err);
-		return err;
-	}
+	// err = aws_iot_send(&msg);
+	// if (err) {
+	// 	LOG_ERR("aws_iot_send, error: %d", err);
+	// 	return err;
+	// }
 
 	return 0;
 }
 
 int cloud_wrap_memfault_data_send(char *buf, size_t len)
 {
-	int err;
-	struct aws_iot_data msg = {
-		.ptr = buf,
-		.len = len,
-		.qos = MQTT_QOS_0_AT_MOST_ONCE,
-		/* <imei>/memfault */
-		.topic = pub_topics[APP_PUB_TOPIC_IDX_MEMFAULT]
-	};
+	// int err;
 
-	err = aws_iot_send(&msg);
-	if (err) {
-		LOG_ERR("aws_iot_send, error: %d", err);
-		return err;
-	}
+	// /** Memfault data is directly forwarded to cloud. */
+
+	// struct aws_iot_data msg = {
+	// 	.ptr = buf,
+	// 	.len = len,
+	// 	.qos = MQTT_QOS_0_AT_MOST_ONCE,
+	// 	/* <imei>/memfault */
+	// 	.topic = pub_topics[APP_PUB_TOPIC_IDX_MEMFAULT]
+	// };
+
+	// err = aws_iot_send(&msg);
+	// if (err) {
+	// 	LOG_ERR("aws_iot_send, error: %d", err);
+	// 	return err;
+	// }
 
 	return 0;
 }

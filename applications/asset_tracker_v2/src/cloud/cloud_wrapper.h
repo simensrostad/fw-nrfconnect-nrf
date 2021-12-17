@@ -13,6 +13,8 @@
 
 #include <zephyr.h>
 
+#include "cloud_codec.h"
+
 /**
  * @defgroup cloud_wrapper Cloud wrapper library
  * @{
@@ -130,7 +132,7 @@ int cloud_wrap_state_get(void);
  *
  * @return 0 on success, or a negative error code on failure.
  */
-int cloud_wrap_state_send(char *buf, size_t len);
+int cloud_wrap_config_send(struct cloud_data_cfg *config);
 
 /**
  * @brief Send data to cloud.
@@ -140,7 +142,7 @@ int cloud_wrap_state_send(char *buf, size_t len);
  *
  * @return 0 on success, or a negative error code on failure.
  */
-int cloud_wrap_data_send(char *buf, size_t len);
+int cloud_wrap_data_send(void);
 
 /**
  * @brief Send batched data to cloud.
@@ -150,7 +152,7 @@ int cloud_wrap_data_send(char *buf, size_t len);
  *
  * @return 0 on success, or a negative error code on failure.
  */
-int cloud_wrap_batch_send(char *buf, size_t len);
+int cloud_wrap_batch_send(void);
 
 /**
  * @brief Send UI data to cloud.
@@ -160,8 +162,7 @@ int cloud_wrap_batch_send(char *buf, size_t len);
  *
  * @return 0 on success, or a negative error code on failure.
  */
-int cloud_wrap_ui_send(char *buf, size_t len);
-
+int cloud_wrap_ui_send(void);
 /**
  * @brief Send neighbor cell data to cloud.
  *
@@ -170,7 +171,7 @@ int cloud_wrap_ui_send(char *buf, size_t len);
  *
  * @return 0 on success, or a negative error code on failure.
  */
-int cloud_wrap_neighbor_cells_send(char *buf, size_t len);
+int cloud_wrap_neighbor_cells_send(void);
 
 /**
  * @brief Send A-GPS request to cloud.
@@ -180,7 +181,7 @@ int cloud_wrap_neighbor_cells_send(char *buf, size_t len);
  *
  * @return 0 on success, or a negative error code on failure.
  */
-int cloud_wrap_agps_request_send(char *buf, size_t len);
+int cloud_wrap_agps_request_send(struct cloud_data_agps_request *request);
 
 /**
  * @brief Send P-GPS request to cloud.
@@ -190,7 +191,7 @@ int cloud_wrap_agps_request_send(char *buf, size_t len);
  *
  * @return 0 on success, or a negative error code on failure.
  */
-int cloud_wrap_pgps_request_send(char *buf, size_t len);
+int cloud_wrap_pgps_request_send(struct cloud_data_pgps_request *request);
 
 /**
  * @brief Send Memfault data to cloud.

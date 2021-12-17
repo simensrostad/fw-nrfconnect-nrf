@@ -63,35 +63,6 @@ static enum state_type {
 	STATE_SHUTDOWN
 } state;
 
-/* Ringbuffers. All data received by the Data module are stored in ringbuffers.
- * Upon a LTE connection loss the device will keep sampling/storing data in
- * the buffers, and empty the buffers in batches upon a reconnect.
- */
-static struct cloud_data_gnss gnss_buf[CONFIG_DATA_GNSS_BUFFER_COUNT];
-static struct cloud_data_sensors sensors_buf[CONFIG_DATA_SENSOR_BUFFER_COUNT];
-static struct cloud_data_ui ui_buf[CONFIG_DATA_UI_BUFFER_COUNT];
-static struct cloud_data_accelerometer accel_buf[CONFIG_DATA_ACCELEROMETER_BUFFER_COUNT];
-static struct cloud_data_battery bat_buf[CONFIG_DATA_BATTERY_BUFFER_COUNT];
-static struct cloud_data_modem_dynamic modem_dyn_buf[CONFIG_DATA_MODEM_DYNAMIC_BUFFER_COUNT];
-static struct cloud_data_neighbor_cells neighbor_cells;
-
-/* Static modem data does not change between firmware versions and does not
- * have to be buffered.
- */
-static struct cloud_data_modem_static modem_stat;
-/* Size of the static modem (modem_stat) data structure.
- * Used to provide an array size when encoding batch data.
- */
-#define MODEM_STATIC_ARRAY_SIZE 1
-
-/* Head of ringbuffers. */
-static int head_gnss_buf;
-static int head_sensor_buf;
-static int head_modem_dyn_buf;
-static int head_ui_buf;
-static int head_accel_buf;
-static int head_bat_buf;
-
 /* Default device configuration. */
 static struct cloud_data_cfg current_cfg = {
 	.gnss_timeout			= CONFIG_DATA_GNSS_TIMEOUT_SECONDS,
@@ -124,28 +95,6 @@ static int recv_req_data_count;
  */
 static int req_data_count;
 
-/* List of data types sent out by the data module. */
-enum data_type {
-	UNUSED,
-	GENERIC,
-	BATCH,
-	UI,
-	NEIGHBOR_CELLS,
-	AGPS_REQUEST,
-	CONFIG
-};
-
-struct ack_data {
-	enum data_type type;
-	size_t len;
-	void *ptr;
-};
-
-/* Data that has been attempted to be sent but failed. */
-static struct ack_data failed_data[CONFIG_FAILED_DATA_COUNT];
-
-/* Data that has been encoded and shipped on, but has not yet been ACKed. */
-static struct ack_data pending_data[CONFIG_PENDING_DATA_COUNT];
 
 /* Data module message queue. */
 #define DATA_QUEUE_ENTRY_COUNT		10
@@ -314,151 +263,6 @@ static void date_time_event_handler(const struct date_time_evt *evt)
 	}
 }
 
-/* Static module functions. */
-static void data_list_clear_entry(struct ack_data *data)
-{
-	data->ptr = NULL,
-	data->len = 0;
-	data->type = UNUSED;
-}
-
-static void data_list_clear_and_free(struct ack_data *list, size_t list_count)
-{
-	for (size_t i = 0; i < list_count; i++) {
-		if (list[i].ptr != NULL) {
-			k_free(list[i].ptr);
-			data_list_clear_entry(&list[i]);
-		}
-	}
-
-	LOG_WRN("Data list cleared and freed");
-}
-
-static void data_list_add_failed(void *ptr, size_t len, enum data_type type)
-{
-	while (true) {
-		for (size_t i = 0; i < ARRAY_SIZE(failed_data); i++) {
-			if (failed_data[i].ptr == NULL) {
-				failed_data[i].ptr = ptr;
-				failed_data[i].len = len;
-				failed_data[i].type = type;
-
-				LOG_DBG("Failed data added: %p",
-					failed_data[i].ptr);
-				return;
-			}
-		}
-
-		LOG_WRN("Could not add data to failed data list, list is full");
-		LOG_WRN("Clearing failed data list and adding data");
-
-		data_list_clear_and_free(failed_data, ARRAY_SIZE(failed_data));
-	}
-}
-
-static void data_list_add_pending(void *ptr, size_t len, enum data_type type)
-{
-	for (size_t i = 0; i < ARRAY_SIZE(pending_data); i++) {
-		if (pending_data[i].ptr == NULL) {
-			pending_data[i].ptr = ptr;
-			pending_data[i].len = len;
-			pending_data[i].type = type;
-
-			LOG_DBG("Pending data added: %p", pending_data[i].ptr);
-			return;
-		}
-	}
-
-	LOG_ERR("Could not add data to pending data list, list is full");
-	SEND_ERROR(data, DATA_EVT_ERROR, -ENFILE);
-}
-
-static void data_resend(void)
-{
-	struct data_module_event *evt;
-
-	for (size_t i = 0; i < ARRAY_SIZE(failed_data); i++) {
-		if (failed_data[i].ptr != NULL) {
-
-			evt = new_data_module_event();
-
-			switch (failed_data[i].type) {
-			case GENERIC:
-				evt->type = DATA_EVT_DATA_SEND;
-				break;
-			case BATCH:
-				evt->type = DATA_EVT_DATA_SEND_BATCH;
-				break;
-			case CONFIG:
-				evt->type = DATA_EVT_CONFIG_SEND;
-				break;
-			case UI:
-				evt->type = DATA_EVT_UI_DATA_SEND;
-				break;
-			case NEIGHBOR_CELLS:
-				evt->type = DATA_EVT_NEIGHBOR_CELLS_DATA_SEND;
-				break;
-			case AGPS_REQUEST:
-				evt->type = DATA_EVT_AGPS_REQUEST_DATA_SEND;
-				break;
-			default:
-				LOG_WRN("Unknown associated data type");
-				SEND_ERROR(data, DATA_EVT_ERROR, -ENODATA);
-				return;
-			}
-
-			evt->data.buffer.buf = failed_data[i].ptr;
-			evt->data.buffer.len = failed_data[i].len;
-			LOG_WRN("Resending data: %.*s", failed_data[i].len,
-				log_strdup(failed_data[i].ptr));
-			EVENT_SUBMIT(evt);
-
-			/* Move data from failed to pending data list after
-			 * resend.
-			 */
-
-			/* Add entry to pending data list. */
-			data_list_add_pending(failed_data[i].ptr,
-					      failed_data[i].len,
-					      failed_data[i].type);
-
-			/* Remove entry from failed data list. */
-			data_list_clear_entry(&failed_data[i]);
-		}
-	}
-}
-
-static void data_ack(void *ptr, bool sent)
-{
-	/* Move data from pending to failed data list if incoming data is
-	 * flagged as not sent. If data is flagged as sent, free entry in
-	 * pending data list.
-	 */
-
-	for (size_t i = 0; i < ARRAY_SIZE(pending_data); i++) {
-		if (pending_data[i].ptr == ptr) {
-			if (sent) {
-				k_free(ptr);
-				LOG_DBG("Pending data ACKed: %p",
-					pending_data[i].ptr);
-			} else {
-				LOG_DBG("Moving %p data from pending to failed",
-					pending_data[i].ptr);
-
-				/* Add data to failed data list. */
-				data_list_add_failed(pending_data[i].ptr,
-						     pending_data[i].len,
-						     pending_data[i].type);
-			}
-			data_list_clear_entry(&pending_data[i]);
-			return;
-		}
-	}
-
-	LOG_ERR("No matching pointer was found in pending data list");
-	SEND_ERROR(data, DATA_EVT_ERROR, -ENOTDIR);
-}
-
 static int save_config(const void *buf, size_t buf_len)
 {
 	int err;
@@ -534,113 +338,14 @@ static void config_distribute(enum data_module_event_type type)
 	EVENT_SUBMIT(data_module_event);
 }
 
-static void data_send(enum data_module_event_type event,
-		      enum data_type type,
-		      struct cloud_codec_data *data)
+static void agps_send(struct cloud_data_agps_request *incoming_request)
 {
-	struct data_module_event *module_event = new_data_module_event();
+	struct data_module_event *data_module_event = new_data_module_event();
 
-	module_event->type = event;
-	module_event->data.buffer.buf = data->buf;
-	module_event->data.buffer.len = data->len;
+	data_module_event->type = DATA_EVT_AGPS_REQUEST_DATA_SEND;
+	data_module_event->data.agps_request = *incoming_request;
 
-	data_list_add_pending(data->buf, data->len, type);
-	EVENT_SUBMIT(module_event);
-
-	/* Reset buffer */
-	data->buf = NULL;
-	data->len = 0;
-}
-
-/* This function allocates buffer on the heap, which needs to be freed after use. */
-static void data_encode(void)
-{
-	int err;
-	struct cloud_codec_data codec = {0};
-
-	if (!date_time_is_valid()) {
-		/* Date time library does not have valid time to
-		 * timestamp cloud data. Abort cloud publicaton. Data will
-		 * be cached in it respective ringbuffer.
-		 */
-		return;
-	}
-
-	err = cloud_codec_encode_neighbor_cells(&codec, &neighbor_cells);
-	switch (err) {
-	case 0:
-		LOG_DBG("Neighbor cell data encoded successfully");
-		data_send(DATA_EVT_NEIGHBOR_CELLS_DATA_SEND, NEIGHBOR_CELLS, &codec);
-		break;
-	case -ENOTSUP:
-		/* Neighbor cell data encoding not supported */
-		break;
-	case -ENODATA:
-		LOG_DBG("No neighbor cells data to encode, error: %d", err);
-		break;
-	default:
-		LOG_ERR("Error encoding neighbor cells data: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
-		return;
-	}
-
-	err = cloud_codec_encode_data(
-		&codec,
-		&gnss_buf[head_gnss_buf],
-		&sensors_buf[head_sensor_buf],
-		&modem_stat,
-		&modem_dyn_buf[head_modem_dyn_buf],
-		&ui_buf[head_ui_buf],
-		&accel_buf[head_accel_buf],
-		&bat_buf[head_bat_buf]);
-	switch (err) {
-	case 0:
-		LOG_DBG("Data encoded successfully");
-		data_send(DATA_EVT_DATA_SEND, GENERIC, &codec);
-		break;
-	case -ENODATA:
-		/* This error might occur when data has not been obtained prior
-		 * to data encoding.
-		 */
-		LOG_DBG("No new data to encode");
-		break;
-	case -ENOTSUP:
-		LOG_DBG("Regular data updates are not supported, data will be published in batch");
-		break;
-	default:
-		LOG_ERR("Error encoding message %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
-		return;
-	}
-
-	err = cloud_codec_encode_batch_data(&codec,
-					    gnss_buf,
-					    sensors_buf,
-					    &modem_stat,
-					    modem_dyn_buf,
-					    ui_buf,
-					    accel_buf,
-					    bat_buf,
-					    ARRAY_SIZE(gnss_buf),
-					    ARRAY_SIZE(sensors_buf),
-					    MODEM_STATIC_ARRAY_SIZE,
-					    ARRAY_SIZE(modem_dyn_buf),
-					    ARRAY_SIZE(ui_buf),
-					    ARRAY_SIZE(accel_buf),
-					    ARRAY_SIZE(bat_buf));
-	switch (err) {
-	case 0:
-		LOG_DBG("Batch data encoded successfully");
-		data_send(DATA_EVT_DATA_SEND_BATCH, BATCH, &codec);
-		break;
-	case -ENODATA:
-		LOG_DBG("No batch data to encode, ringbuffers are empty");
-		break;
-	default:
-		LOG_ERR("Error batch-enconding data: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
-		return;
-	}
+	EVENT_SUBMIT(data_module_event);
 }
 
 #if defined(CONFIG_NRF_CLOUD_AGPS) && !defined(CONFIG_NRF_CLOUD_MQTT)
@@ -679,10 +384,9 @@ static int get_modem_info(struct modem_param_info *const modem_info)
  *
  * @return 0 on success, otherwise a negative error code indicating reason of failure.
  */
-static int agps_request_encode(struct nrf_modem_gnss_agps_data_frame *incoming_request)
+static int construct_agps_request(struct nrf_modem_gnss_agps_data_frame *incoming_request)
 {
 	int err;
-	struct cloud_codec_data codec = {0};
 	static struct modem_param_info modem_info = {0};
 	static struct cloud_data_agps_request cloud_agps_request = {0};
 
@@ -704,89 +408,10 @@ static int agps_request_encode(struct nrf_modem_gnss_agps_data_frame *incoming_r
 	cloud_agps_request.mask_angle = CONFIG_GNSS_MODULE_ELEVATION_MASK;
 #endif
 
-	err = cloud_codec_encode_agps_request(&codec, &cloud_agps_request);
-	switch (err) {
-	case 0:
-		LOG_DBG("A-GPS request encoded successfully");
-		data_send(DATA_EVT_AGPS_REQUEST_DATA_SEND, AGPS_REQUEST, &codec);
-		break;
-	case -ENOTSUP:
-		LOG_WRN("Encoding of A-GPS requests are not supported by the configured codec");
-		break;
-	case -ENODATA:
-		LOG_DBG("No A-GPS request data to encode, error: %d", err);
-		break;
-	default:
-		LOG_ERR("Error encoding A-GPS request: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
-		break;
-	}
-
+	agps_send(&cloud_agps_request);
 	return err;
 }
 #endif /* CONFIG_NRF_CLOUD_AGPS && !CONFIG_NRF_CLOUD_MQTT */
-
-static void config_get(void)
-{
-	SEND_EVENT(data, DATA_EVT_CONFIG_GET);
-}
-
-static void config_send(void)
-{
-	int err;
-	struct cloud_codec_data codec;
-	struct data_module_event *evt;
-
-	err = cloud_codec_encode_config(&codec, &current_cfg);
-	if (err) {
-		LOG_ERR("Error encoding configuration, error: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
-		return;
-	}
-
-	evt = new_data_module_event();
-	evt->type = DATA_EVT_CONFIG_SEND;
-	evt->data.buffer.buf = codec.buf;
-	evt->data.buffer.len = codec.len;
-
-	data_list_add_pending(codec.buf, codec.len, CONFIG);
-	EVENT_SUBMIT(evt);
-
-}
-
-static void data_ui_send(void)
-{
-	int err;
-	struct data_module_event *evt;
-	struct cloud_codec_data codec = {0};
-
-	if (!date_time_is_valid()) {
-		/* Date time library does not have valid time to
-		 * timestamp cloud data. Abort cloud publicaton. Data will
-		 * be cached in it respective ringbuffer.
-		 */
-		return;
-	}
-
-	err = cloud_codec_encode_ui_data(&codec, &ui_buf[head_ui_buf]);
-	if (err == -ENODATA) {
-		LOG_DBG("No new UI data to encode, error: %d", err);
-		return;
-	} else if (err) {
-		LOG_ERR("Encoding button press, error: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
-		return;
-	}
-
-	evt = new_data_module_event();
-	evt->type = DATA_EVT_UI_DATA_SEND;
-	evt->data.buffer.buf = codec.buf;
-	evt->data.buffer.len = codec.len;
-
-	data_list_add_pending(codec.buf, codec.len, UI);
-
-	EVENT_SUBMIT(evt);
-}
 
 static void requested_data_clear(void)
 {
@@ -963,7 +588,7 @@ static void new_config_handle(struct cloud_data_cfg *new_config)
 	 * between reported parameters in the cloud-side state and parameters reported by the
 	 * device.
 	 */
-	config_send();
+	config_distribute(DATA_EVT_CONFIG_SEND);
 }
 
 /**
@@ -996,13 +621,8 @@ static void agps_request_handle(struct nrf_modem_gnss_agps_data_frame *incoming_
 	 * A-GPS request and send out an event containing the request for the cloud module to pick
 	 * up and send to the cloud that is currently used.
 	 */
-	err = agps_request_encode(incoming_request);
-	if (err) {
-		LOG_WRN("Failed to request A-GPS data, error: %d", err);
-	} else {
-		LOG_DBG("A-GPS request sent");
-		return;
-	}
+	construct_agps_request(incoming_request);
+
 #endif
 
 #if defined(CONFIG_NRF_CLOUD_PGPS)
@@ -1031,19 +651,12 @@ static void on_cloud_state_disconnected(struct data_msg_data *msg)
 static void on_cloud_state_connected(struct data_msg_data *msg)
 {
 	if (IS_EVENT(msg, data, DATA_EVT_DATA_READY)) {
-		/* Resend data previously failed to be sent. */
-		data_resend();
-		data_encode();
+		SEND_EVENT(data, DATA_EVT_DATA_SEND);
 		return;
 	}
 
 	if (IS_EVENT(msg, app, APP_EVT_CONFIG_GET)) {
-		config_get();
-		return;
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_UI_DATA_READY)) {
-		data_ui_send();
+		SEND_EVENT(cloud, DATA_EVT_CONFIG_GET);
 		return;
 	}
 
@@ -1053,7 +666,7 @@ static void on_cloud_state_connected(struct data_msg_data *msg)
 	}
 
 	if (IS_EVENT(msg, cloud, CLOUD_EVT_CONFIG_EMPTY)) {
-		config_send();
+		config_distribute(DATA_EVT_CONFIG_SEND);
 		return;
 	}
 }
@@ -1120,219 +733,34 @@ static void on_all_states(struct data_msg_data *msg)
 		return;
 	}
 
-	if (IS_EVENT(msg, ui, UI_EVT_BUTTON_DATA_READY)) {
-		struct cloud_data_ui new_ui_data = {
-			.btn = msg->module.ui.data.ui.button_number,
-			.btn_ts = msg->module.ui.data.ui.timestamp,
-			.queued = true
-		};
-
-		cloud_codec_populate_ui_buffer(ui_buf, &new_ui_data,
-					       &head_ui_buf,
-					       ARRAY_SIZE(ui_buf));
-
-		SEND_EVENT(data, DATA_EVT_UI_DATA_READY);
-		return;
-	}
-
-	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_NOT_READY)) {
+	if ((IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_NOT_READY)) ||
+	    (IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_READY))) {
 		requested_data_status_set(APP_DATA_MODEM_STATIC);
 	}
 
-	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_READY)) {
-		modem_stat.ts = msg->module.modem.data.modem_static.timestamp;
-		modem_stat.queued = true;
-
-		BUILD_ASSERT(sizeof(modem_stat.appv) >=
-			     sizeof(msg->module.modem.data.modem_static.app_version));
-
-		BUILD_ASSERT(sizeof(modem_stat.brdv) >=
-			     sizeof(msg->module.modem.data.modem_static.board_version));
-
-		BUILD_ASSERT(sizeof(modem_stat.fw) >=
-			     sizeof(msg->module.modem.data.modem_static.modem_fw));
-
-		BUILD_ASSERT(sizeof(modem_stat.iccid) >=
-			     sizeof(msg->module.modem.data.modem_static.iccid));
-
-		BUILD_ASSERT(sizeof(modem_stat.imei) >=
-			     sizeof(msg->module.modem.data.modem_static.imei));
-
-		strcpy(modem_stat.appv, msg->module.modem.data.modem_static.app_version);
-		strcpy(modem_stat.brdv, msg->module.modem.data.modem_static.board_version);
-		strcpy(modem_stat.fw, msg->module.modem.data.modem_static.modem_fw);
-		strcpy(modem_stat.iccid, msg->module.modem.data.modem_static.iccid);
-		strcpy(modem_stat.imei, msg->module.modem.data.modem_static.imei);
-
-		requested_data_status_set(APP_DATA_MODEM_STATIC);
-	}
-
-	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_DYNAMIC_DATA_NOT_READY)) {
+	if ((IS_EVENT(msg, modem, MODEM_EVT_MODEM_DYNAMIC_DATA_READY)) ||
+	    (IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_NOT_READY))) {
 		requested_data_status_set(APP_DATA_MODEM_DYNAMIC);
 	}
 
-	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_DYNAMIC_DATA_READY)) {
-		struct cloud_data_modem_dynamic new_modem_data = {
-			.area = msg->module.modem.data.modem_dynamic.area_code,
-			.nw_mode = msg->module.modem.data.modem_dynamic.nw_mode,
-			.band = msg->module.modem.data.modem_dynamic.band,
-			.cell = msg->module.modem.data.modem_dynamic.cell_id,
-			.rsrp = msg->module.modem.data.modem_dynamic.rsrp,
-			.ts = msg->module.modem.data.modem_dynamic.timestamp,
-
-			.area_code_fresh = msg->module.modem.data.modem_dynamic.area_code_fresh,
-			.nw_mode_fresh = msg->module.modem.data.modem_dynamic.nw_mode_fresh,
-			.band_fresh = msg->module.modem.data.modem_dynamic.band_fresh,
-			.cell_id_fresh = msg->module.modem.data.modem_dynamic.cell_id_fresh,
-			.rsrp_fresh = msg->module.modem.data.modem_dynamic.rsrp_fresh,
-			.ip_address_fresh = msg->module.modem.data.modem_dynamic.ip_address_fresh,
-			.mccmnc_fresh = msg->module.modem.data.modem_dynamic.mccmnc_fresh,
-			.queued = true
-		};
-
-		BUILD_ASSERT(sizeof(new_modem_data.ip) >=
-			     sizeof(msg->module.modem.data.modem_dynamic.ip_address));
-
-		BUILD_ASSERT(sizeof(new_modem_data.mccmnc) >=
-			     sizeof(msg->module.modem.data.modem_dynamic.mccmnc));
-
-		strcpy(new_modem_data.ip, msg->module.modem.data.modem_dynamic.ip_address);
-		strcpy(new_modem_data.mccmnc, msg->module.modem.data.modem_dynamic.mccmnc);
-
-		cloud_codec_populate_modem_dynamic_buffer(
-						modem_dyn_buf,
-						&new_modem_data,
-						&head_modem_dyn_buf,
-						ARRAY_SIZE(modem_dyn_buf));
-
-		requested_data_status_set(APP_DATA_MODEM_DYNAMIC);
-	}
-
-	if (IS_EVENT(msg, modem, MODEM_EVT_BATTERY_DATA_NOT_READY)) {
+	if ((IS_EVENT(msg, modem, MODEM_EVT_BATTERY_DATA_READY)) ||
+	    (IS_EVENT(msg, modem, MODEM_EVT_BATTERY_DATA_NOT_READY))) {
 		requested_data_status_set(APP_DATA_BATTERY);
 	}
 
-	if (IS_EVENT(msg, modem, MODEM_EVT_BATTERY_DATA_READY)) {
-		struct cloud_data_battery new_battery_data = {
-			.bat = msg->module.modem.data.bat.battery_voltage,
-			.bat_ts = msg->module.modem.data.bat.timestamp,
-			.queued = true
-		};
-
-		cloud_codec_populate_bat_buffer(bat_buf, &new_battery_data,
-						&head_bat_buf,
-						ARRAY_SIZE(bat_buf));
-
-		requested_data_status_set(APP_DATA_BATTERY);
-	}
-
-	if (IS_EVENT(msg, sensor, SENSOR_EVT_ENVIRONMENTAL_DATA_READY)) {
-		struct cloud_data_sensors new_sensor_data = {
-			.temperature = msg->module.sensor.data.sensors.temperature,
-			.humidity = msg->module.sensor.data.sensors.humidity,
-			.pressure = msg->module.sensor.data.sensors.pressure,
-			.env_ts = msg->module.sensor.data.sensors.timestamp,
-			.queued = true
-		};
-
-		cloud_codec_populate_sensor_buffer(sensors_buf,
-						   &new_sensor_data,
-						   &head_sensor_buf,
-						   ARRAY_SIZE(sensors_buf));
-
+	if ((IS_EVENT(msg, sensor, SENSOR_EVT_ENVIRONMENTAL_DATA_READY)) ||
+	    (IS_EVENT(msg, sensor, SENSOR_EVT_ENVIRONMENTAL_DATA_READY))) {
 		requested_data_status_set(APP_DATA_ENVIRONMENTAL);
 	}
 
-	if (IS_EVENT(msg, sensor, SENSOR_EVT_ENVIRONMENTAL_NOT_SUPPORTED)) {
-		requested_data_status_set(APP_DATA_ENVIRONMENTAL);
-	}
-
-	if (IS_EVENT(msg, sensor, SENSOR_EVT_MOVEMENT_DATA_READY)) {
-		struct cloud_data_accelerometer new_movement_data = {
-			.values[0] = msg->module.sensor.data.accel.values[0],
-			.values[1] = msg->module.sensor.data.accel.values[1],
-			.values[2] = msg->module.sensor.data.accel.values[2],
-			.ts = msg->module.sensor.data.accel.timestamp,
-			.queued = true
-		};
-
-		cloud_codec_populate_accel_buffer(accel_buf, &new_movement_data,
-						  &head_accel_buf,
-						  ARRAY_SIZE(accel_buf));
-	}
-
-	if (IS_EVENT(msg, gnss, GNSS_EVT_DATA_READY)) {
-		struct cloud_data_gnss new_gnss_data = {
-			.gnss_ts = msg->module.gnss.data.gnss.timestamp,
-			.queued = true,
-			.format = msg->module.gnss.data.gnss.format
-		};
-
-		switch (msg->module.gnss.data.gnss.format) {
-		case GNSS_MODULE_DATA_FORMAT_PVT: {
-			/* Add PVT data */
-			new_gnss_data.pvt.acc = msg->module.gnss.data.gnss.pvt.accuracy;
-			new_gnss_data.pvt.alt = msg->module.gnss.data.gnss.pvt.altitude;
-			new_gnss_data.pvt.hdg = msg->module.gnss.data.gnss.pvt.heading;
-			new_gnss_data.pvt.lat = msg->module.gnss.data.gnss.pvt.latitude;
-			new_gnss_data.pvt.longi = msg->module.gnss.data.gnss.pvt.longitude;
-			new_gnss_data.pvt.spd = msg->module.gnss.data.gnss.pvt.speed;
-
-		};
-			break;
-		case GNSS_MODULE_DATA_FORMAT_NMEA: {
-			/* Add NMEA data */
-			BUILD_ASSERT(sizeof(new_gnss_data.nmea) >=
-				     sizeof(msg->module.gnss.data.gnss.nmea));
-
-			strcpy(new_gnss_data.nmea, msg->module.gnss.data.gnss.nmea);
-		};
-			break;
-		case GNSS_MODULE_DATA_FORMAT_INVALID:
-			/* Fall through */
-		default:
-			LOG_WRN("Event does not carry valid GNSS data");
-			return;
-		}
-
-		cloud_codec_populate_gnss_buffer(gnss_buf, &new_gnss_data,
-						&head_gnss_buf,
-						ARRAY_SIZE(gnss_buf));
-
+	if ((IS_EVENT(msg, gnss, GNSS_EVT_DATA_READY)) ||
+	    (IS_EVENT(msg, gnss, GNSS_EVT_TIMEOUT))) {
 		requested_data_status_set(APP_DATA_GNSS);
 	}
 
-	if (IS_EVENT(msg, modem, MODEM_EVT_NEIGHBOR_CELLS_DATA_READY)) {
-		BUILD_ASSERT(sizeof(neighbor_cells.cell_data) ==
-			     sizeof(msg->module.modem.data.neighbor_cells.cell_data));
-
-		BUILD_ASSERT(sizeof(neighbor_cells.neighbor_cells) ==
-			     sizeof(msg->module.modem.data.neighbor_cells.neighbor_cells));
-
-		memcpy(&neighbor_cells.cell_data, &msg->module.modem.data.neighbor_cells.cell_data,
-		       sizeof(neighbor_cells.cell_data));
-
-		memcpy(&neighbor_cells.neighbor_cells,
-		       &msg->module.modem.data.neighbor_cells.neighbor_cells,
-		       sizeof(neighbor_cells.neighbor_cells));
-
-		neighbor_cells.ts = msg->module.modem.data.neighbor_cells.timestamp;
-		neighbor_cells.queued = true;
-
+	if ((IS_EVENT(msg, modem, MODEM_EVT_NEIGHBOR_CELLS_DATA_READY)) ||
+	    (IS_EVENT(msg, modem, MODEM_EVT_NEIGHBOR_CELLS_DATA_NOT_READY))) {
 		requested_data_status_set(APP_DATA_NEIGHBOR_CELLS);
-	}
-
-	if (IS_EVENT(msg, modem, MODEM_EVT_NEIGHBOR_CELLS_DATA_NOT_READY)) {
-		requested_data_status_set(APP_DATA_NEIGHBOR_CELLS);
-	}
-
-	if (IS_EVENT(msg, gnss, GNSS_EVT_TIMEOUT)) {
-		requested_data_status_set(APP_DATA_GNSS);
-	}
-
-	if (IS_EVENT(msg, cloud, CLOUD_EVT_DATA_ACK)) {
-		data_ack(msg->module.cloud.data.ack.ptr,
-			 msg->module.cloud.data.ack.sent);
 	}
 }
 
