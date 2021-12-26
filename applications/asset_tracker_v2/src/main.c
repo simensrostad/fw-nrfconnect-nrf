@@ -350,21 +350,21 @@ static void data_get(void)
 	 * passive mode.
 	 */
 
-	if (first) {
-		if (IS_ENABLED(CONFIG_APP_REQUEST_GNSS_ON_INITIAL_SAMPLING) &&
-		    !app_cfg.no_data.gnss) {
-			app_module_event->data_list[count++] = APP_DATA_GNSS;
-			app_module_event->timeout = MAX(app_cfg.gnss_timeout + 15, 75);
-		}
+	// if (first) {
+	// 	if (IS_ENABLED(CONFIG_APP_REQUEST_GNSS_ON_INITIAL_SAMPLING) &&
+	// 	    !app_cfg.no_data.gnss) {
+	// 		app_module_event->data_list[count++] = APP_DATA_GNSS;
+	// 		app_module_event->timeout = MAX(app_cfg.gnss_timeout + 15, 75);
+	// 	}
 
-		app_module_event->data_list[count++] = APP_DATA_MODEM_STATIC;
-		first = false;
-	} else {
-		if (!app_cfg.no_data.gnss) {
-			app_module_event->data_list[count++] = APP_DATA_GNSS;
-			app_module_event->timeout = MAX(app_cfg.gnss_timeout + 15, 75);
-		}
-	}
+	// 	app_module_event->data_list[count++] = APP_DATA_MODEM_STATIC;
+	// 	first = false;
+	// } else {
+	// 	if (!app_cfg.no_data.gnss) {
+	// 		app_module_event->data_list[count++] = APP_DATA_GNSS;
+	// 		app_module_event->timeout = MAX(app_cfg.gnss_timeout + 15, 75);
+	// 	}
+	// }
 
 	/* Set list count to number of data types passed in app_module_event. */
 	app_module_event->count = count;

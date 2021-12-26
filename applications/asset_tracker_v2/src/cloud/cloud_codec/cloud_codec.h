@@ -156,6 +156,8 @@ struct cloud_data_modem_dynamic {
 	/** Band number. */
 	uint8_t band;
 	/** Network mode. */
+	uint16_t mcc;
+	uint16_t mnc;
 	enum lte_lc_lte_mode nw_mode;
 	/** Area code. */
 	uint16_t area;

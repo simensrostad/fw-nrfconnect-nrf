@@ -184,6 +184,8 @@ struct modem_module_dynamic_modem_data {
 	uint16_t area_code;
 	uint32_t cell_id;
 	int16_t rsrp;
+	uint16_t mcc;
+	uint16_t mnc;
 	char ip_address[INET6_ADDRSTRLEN];
 	char mccmnc[7];
 	uint8_t band;

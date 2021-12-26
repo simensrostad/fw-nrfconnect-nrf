@@ -43,7 +43,8 @@ BUILD_ASSERT(CONFIG_CLOUD_CONNECT_RETRIES < 14,
 
 BUILD_ASSERT(IS_ENABLED(CONFIG_NRF_CLOUD_MQTT) ||
 	     IS_ENABLED(CONFIG_AWS_IOT)	       ||
-	     IS_ENABLED(CONFIG_AZURE_IOT_HUB),
+	     IS_ENABLED(CONFIG_AZURE_IOT_HUB)  ||
+	     IS_ENABLED(CONFIG_LWM2M_INTEGRATION),
 	     "A cloud transport service must be enabled");
 
 struct cloud_msg_data {
@@ -841,6 +842,8 @@ static void on_all_states(struct cloud_msg_data *msg)
 			.band = msg->module.modem.data.modem_dynamic.band,
 			.cell = msg->module.modem.data.modem_dynamic.cell_id,
 			.rsrp = msg->module.modem.data.modem_dynamic.rsrp,
+			.mcc = msg->module.modem.data.modem_dynamic.mcc,
+			.mnc = msg->module.modem.data.modem_dynamic.mnc,
 			.ts = msg->module.modem.data.modem_dynamic.timestamp,
 
 			.area_code_fresh = msg->module.modem.data.modem_dynamic.area_code_fresh,

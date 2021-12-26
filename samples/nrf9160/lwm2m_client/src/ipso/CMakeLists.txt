@@ -6,3 +6,5 @@
 
 target_sources_ifdef(CONFIG_LWM2M_IPSO_APP_COLOUR_SENSOR
 	app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ipso_colour_sensor.c)
+
+target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/access_control_object.c)

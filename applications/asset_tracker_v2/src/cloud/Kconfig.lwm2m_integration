@@ -1,0 +1,41 @@
+#
+# Copyright (c) 2021 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+module = LWM2M_INTEGRATION
+module-prompt = "LwM2M integration"
+orsource "../../../../subsys/net/lib/Kconfig.cloud_$(CLOUD_SERVICE_SELECTOR)"
+
+config $(module)
+	bool
+	prompt "LwM2M integration layer" if !CLOUD_SERVICE_MUTUAL_EXCLUSIVE
+
+if LWM2M_INTEGRATION
+
+menu "LwM2M integration library"
+
+config LWM2M_INTEGRATION_ENDPOINT_NAME
+	string "LwM2M endpoint name"
+	default "eu.iot.avsystem.cloud"
+
+config LWM2M_INTEGRATION_ENDPOINT_PREFIX
+	string "LwM2M endpoint prefix"
+	default "urn:imei:"
+
+config LWM2M_INTEGRATION_TLS_TAG
+	int "LwM2M TLS tag"
+	default 35724861
+
+config LWM2M_INTEGRATION_BOOTSTRAP_TLS_TAG
+	int "LwM2M TLS bootstrap tag"
+	default 35724862
+
+config LWM2M_INTEGRATION_PSK
+	string "LwM2M PSK"
+	default "PSK-DUMMY"
+
+endmenu
+
+endif # LWM2M_INTEGRATION

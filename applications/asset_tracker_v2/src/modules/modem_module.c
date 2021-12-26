@@ -649,6 +649,10 @@ static void populate_event_with_dynamic_modem_data(struct modem_module_event *ev
 
 		prev.mccmnc[sizeof(prev.mccmnc) - 1] = '\0';
 
+		/* Provide MNC and MCC as separate values. */
+		event->data.modem_dynamic.mcc = modem_param.network.mcc.value;
+		event->data.modem_dynamic.mnc = modem_param.network.mnc.value;
+
 		event->data.modem_dynamic.mccmnc_fresh = true;
 		params_added = true;
 	}
