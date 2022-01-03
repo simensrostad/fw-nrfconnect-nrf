@@ -421,21 +421,24 @@ static void data_send(void)
 	int err;
 
 	err = cloud_wrap_neighbor_cells_send();
-	if (err) {
-		LOG_ERR("cloud_wrap_data_send, err: %d", err);
-		return;
+	if (err && err == -ENOTSUP) {
+		LOG_DBG("cloud_wrap_neighbor_cells_send API not supported by current integration layer.");
+	} else if (err) {
+		LOG_DBG("cloud_wrap_neighbor_cells_send, err: %d", err);
 	}
 
 	err = cloud_wrap_data_send();
-	if (err) {
-		LOG_ERR("cloud_wrap_data_send, err: %d", err);
-		return;
+	if (err && err == -ENOTSUP) {
+		LOG_DBG("cloud_wrap_data_send API not supported by current integration layer.");
+	} else if (err) {
+		LOG_DBG("cloud_wrap_data_send, err: %d", err);
 	}
 
 	err = cloud_wrap_batch_send();
-	if (err) {
-		LOG_ERR("cloud_wrap_batch_send, err: %d", err);
-		return;
+	if (err && err == -ENOTSUP) {
+		LOG_DBG("cloud_wrap_batch_send API not supported by current integration layer.");
+	} else if (err) {
+		LOG_DBG("cloud_wrap_batch_send, err: %d", err);
 	}
 }
 
