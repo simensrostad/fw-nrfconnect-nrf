@@ -476,6 +476,11 @@ Libraries for networking
     * Updated timeout handling. Now using http_client library timeout also.
     * Removed CONFIG_REST_CLIENT_SCKT_SEND_TIMEOUT and CONFIG_REST_CLIENT_SCKT_RECV_TIMEOUT.
 
+  * :ref:`lib_azure_iot_hub` library:
+
+    * The library has been reworked to use :ref:`Azure SDK for Embedded C`.
+    * The APIs for both IoT Hub and DPS interaction have changed and the applications and samples that use the library have been updated.
+
 Libraries for NFC
 -----------------
 
