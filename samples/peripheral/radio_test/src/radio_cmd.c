@@ -350,15 +350,15 @@ static int cmd_toggle_dc(const struct shell *shell, size_t argc, char **argv)
 
 #if NRF_POWER_HAS_DCDCEN_VDDH
 	shell_print(shell,
-		"DCDC VDDH state %lu\n",
-		"Write '0' to toggle state of DCDC REG0\n",
+		"DCDC VDDH state %d\n"
+		"Write '0' to toggle state of DCDC REG0\n"
 		"Write '1' to toggle state of DCDC REG1",
 		nrf_power_dcdcen_vddh_get(NRF_POWER));
 #endif /* NRF_POWER_HAS_DCDCEN_VDDH */
 
 #if NRF_POWER_HAS_DCDCEN
 	shell_print(shell,
-		"DCDC state %lu\n",
+		"DCDC state %d\n"
 		"Write '1' or '0' to toggle",
 		nrf_power_dcdcen_get(NRF_POWER));
 #endif /* NRF_POWER_HAS_DCDCEN */
