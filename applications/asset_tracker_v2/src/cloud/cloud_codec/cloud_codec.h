@@ -38,6 +38,7 @@ struct cloud_data_battery {
 	bool queued : 1;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_gnss_pvt {
 	/** Longitude */
 	double longi;
@@ -53,6 +54,7 @@ struct cloud_data_gnss_pvt {
 	float hdg;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 enum cloud_data_gnss_format {
 	CLOUD_CODEC_GNSS_FORMAT_INVALID,
 	CLOUD_CODEC_GNSS_FORMAT_PVT,
@@ -92,6 +94,7 @@ struct cloud_data_no_data {
 	bool neighbor_cell;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_cfg {
 	/** Device mode. */
 	bool active_mode;
@@ -111,6 +114,7 @@ struct cloud_data_cfg {
 	struct cloud_data_no_data no_data;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_accelerometer {
 	/** Accelerometer readings timestamp. UNIX milliseconds. */
 	int64_t ts;
@@ -120,6 +124,7 @@ struct cloud_data_accelerometer {
 	bool queued : 1;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_sensors {
 	/** Environmental sensors timestamp. UNIX milliseconds. */
 	int64_t env_ts;
@@ -133,6 +138,7 @@ struct cloud_data_sensors {
 	bool queued : 1;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_modem_static {
 	/** Static modem data timestamp. UNIX milliseconds. */
 	int64_t ts;
@@ -150,6 +156,7 @@ struct cloud_data_modem_static {
 	bool queued : 1;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_modem_dynamic {
 	/** Dynamic modem data timestamp. UNIX milliseconds. */
 	int64_t ts;
@@ -180,6 +187,7 @@ struct cloud_data_modem_dynamic {
 	bool nw_mode_fresh	: 1;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_ui {
 	/** Button number. */
 	int btn;
@@ -189,6 +197,7 @@ struct cloud_data_ui {
 	bool queued : 1;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_codec_data {
 	/** Encoded output. */
 	char *buf;
@@ -196,6 +205,7 @@ struct cloud_codec_data {
 	size_t len;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_neighbor_cells {
 	struct lte_lc_cells_info cell_data;
 	struct lte_lc_ncell neighbor_cells[17];
@@ -203,6 +213,7 @@ struct cloud_data_neighbor_cells {
 	bool queued : 1;
 };
 
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_agps_request {
 	/** Mobile Country Code */
 	int mcc;
@@ -222,6 +233,8 @@ struct cloud_data_agps_request {
 	uint8_t mask_angle;
 
 };
+
+/** @brief Structure containing battery data published to cloud. */
 struct cloud_data_pgps_request {
 	/** Number of requested predictions. */
 	uint16_t count;
@@ -235,26 +248,70 @@ struct cloud_data_pgps_request {
 	bool queued : 1;
 };
 
+/** @brief */
 static inline void cloud_codec_init(void)
 {
 	cJSON_Init();
 }
 
+
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 int cloud_codec_encode_neighbor_cells(struct cloud_codec_data *output,
 				      struct cloud_data_neighbor_cells *neighbor_cells);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 int cloud_codec_encode_agps_request(struct cloud_codec_data *output,
 				    struct cloud_data_agps_request *agps_request);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 int cloud_codec_encode_pgps_request(struct cloud_codec_data *output,
 				    struct cloud_data_pgps_request *pgps_request);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 int cloud_codec_decode_config(char *input, size_t input_len,
 			      struct cloud_data_cfg *cfg);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 int cloud_codec_encode_config(struct cloud_codec_data *output,
 			      struct cloud_data_cfg *cfg);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 int cloud_codec_encode_data(struct cloud_codec_data *output,
 			    struct cloud_data_gnss *gnss_buf,
 			    struct cloud_data_sensors *sensor_buf,
@@ -264,9 +321,23 @@ int cloud_codec_encode_data(struct cloud_codec_data *output,
 			    struct cloud_data_accelerometer *accel_buf,
 			    struct cloud_data_battery *bat_buf);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 int cloud_codec_encode_ui_data(struct cloud_codec_data *output,
 			       struct cloud_data_ui *ui_buf);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 int cloud_codec_encode_batch_data(struct cloud_codec_data *output,
 				  struct cloud_data_gnss *gnss_buf,
 				  struct cloud_data_sensors *sensor_buf,
@@ -283,39 +354,88 @@ int cloud_codec_encode_batch_data(struct cloud_codec_data *output,
 				  size_t accel_buf_count,
 				  size_t bat_buf_count);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 void cloud_codec_populate_sensor_buffer(
 				struct cloud_data_sensors *sensor_buffer,
 				struct cloud_data_sensors *new_sensor_data,
 				int *head_sensor_buf,
 				size_t buffer_count);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 void cloud_codec_populate_ui_buffer(struct cloud_data_ui *ui_buffer,
 				    struct cloud_data_ui *new_ui_data,
 				    int *head_ui_buf,
 				    size_t buffer_count);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 void cloud_codec_populate_accel_buffer(
 				struct cloud_data_accelerometer *accel_buf,
 				struct cloud_data_accelerometer *new_accel_data,
 				int *head_accel_buf,
 				size_t buffer_count);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 void cloud_codec_populate_bat_buffer(struct cloud_data_battery *bat_buffer,
 				     struct cloud_data_battery *new_bat_data,
 				     int *head_bat_buf,
 				     size_t buffer_count);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 void cloud_codec_populate_gnss_buffer(struct cloud_data_gnss *gnss_buffer,
 				     struct cloud_data_gnss *new_gnss_data,
 				     int *head_gnss_buf,
 				     size_t buffer_count);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 void cloud_codec_populate_modem_dynamic_buffer(
 				struct cloud_data_modem_dynamic *modem_buffer,
 				struct cloud_data_modem_dynamic *new_modem_data,
 				int *head_modem_buf,
 				size_t buffer_count);
 
+/** @brief
+ *
+ * @param
+ * @param
+ *
+ * @retval
+*/
 static inline void cloud_codec_release_data(struct cloud_codec_data *output)
 {
 	cJSON_FreeString(output->buf);
