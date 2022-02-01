@@ -8,8 +8,10 @@
 #include <stdio.h>
 #include <modem/lte_lc.h>
 #include <net/socket.h>
+#include <pb_encode.h>
+#include <pb_decode.h>
 
-#define UDP_IP_HEADER_SIZE 28
+#include "src/simple.pb.h"
 
 static int client_fd;
 static struct sockaddr_storage host_addr;
@@ -17,22 +19,47 @@ static struct k_work_delayable server_transmission_work;
 
 K_SEM_DEFINE(lte_connected, 0, 1);
 
+bool encode_message(uint8_t *buffer, size_t buffer_size, size_t *message_length)
+{
+	bool status;
+
+	SimpleMessage message = SimpleMessage_init_zero;
+
+	/* Create a stream that will write to our buffer. */
+	pb_ostream_t stream = pb_ostream_from_buffer(buffer, buffer_size);
+
+	/* Fill in the lucky number */
+	message.lucky_number = 13;
+
+	/* Now we are ready to encode the message! */
+	status = pb_encode(&stream, SimpleMessage_fields, &message);
+	*message_length = stream.bytes_written;
+
+	if (!status) {
+		printk("Encoding failed: %s\n", PB_GET_ERROR(&stream));
+	}
+
+	return status;
+}
+
 static void server_transmission_work_fn(struct k_work *work)
 {
 	int err;
-	char buffer[CONFIG_UDP_DATA_UPLOAD_SIZE_BYTES] = {"\0"};
+	uint8_t buffer[SimpleMessage_size];
+	size_t message_length;
 
-	printk("Transmitting UDP/IP payload of %d bytes to the ",
-	       CONFIG_UDP_DATA_UPLOAD_SIZE_BYTES + UDP_IP_HEADER_SIZE);
-	printk("IP address %s, port number %d\n",
-	       CONFIG_UDP_SERVER_ADDRESS_STATIC,
-	       CONFIG_UDP_SERVER_PORT);
+	/* Encode our message */
+	if (!encode_message(buffer, sizeof(buffer), &message_length)) {
+		return;
+	}
 
 	err = send(client_fd, buffer, sizeof(buffer), 0);
 	if (err < 0) {
 		printk("Failed to transmit UDP packet, %d\n", errno);
 		return;
 	}
+
+	printk("Message send\n");
 
 	k_work_schedule(&server_transmission_work,
 			K_SECONDS(CONFIG_UDP_DATA_UPLOAD_FREQUENCY_SECONDS));
