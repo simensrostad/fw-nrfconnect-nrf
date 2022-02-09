@@ -346,6 +346,8 @@ Modem libraries
 Other libraries
 ---------------
 
+* Added :ref:qos`
+
 * :ref:`event_manager`:
 
   * To add :c:func:`event_manager_event_size` function with corresponding :kconfig:option:`CONFIG_EVENT_MANAGER_PROVIDE_EVENT_SIZE` option.

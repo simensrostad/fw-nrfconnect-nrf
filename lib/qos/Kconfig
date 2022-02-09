@@ -1,0 +1,20 @@
+#
+# Copyright (c) 2022 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig QOS
+	bool "Qos library"
+
+if QOS
+
+config QOS_PENDING_MESSAGES_MAX
+	int "Maximum amount of pending messages"
+	default 20
+
+endif # QOS
+
+module = QOS
+module-str = QoS
+source "subsys/logging/Kconfig.template.log_config"
