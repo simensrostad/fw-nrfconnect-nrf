@@ -760,6 +760,18 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 		LOG_DBG("MQTT_EVT_PUBACK: id = %d result = %d",
 			mqtt_evt->param.puback.message_id,
 			mqtt_evt->result);
+
+		aws_iot_evt.type = AWS_IOT_EVT_PUBACK;
+		aws_iot_evt.data.message_id = mqtt_evt->param.puback.message_id;
+		aws_iot_notify_event(&aws_iot_evt);
+		break;
+	case MQTT_EVT_PINGRESP:
+		LOG_DBG("MQTT_EVT_PINGRESP: id = %d result = %d",
+			mqtt_evt->param.puback.message_id,
+			mqtt_evt->result);
+
+		aws_iot_evt.type = AWS_IOT_EVT_PINGRESP;
+		aws_iot_notify_event(&aws_iot_evt);
 		break;
 	case MQTT_EVT_SUBACK:
 		LOG_DBG("MQTT_EVT_SUBACK: id = %d result = %d",
