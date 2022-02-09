@@ -1599,7 +1599,11 @@ int nrf_cloud_pgps_init(struct nrf_cloud_pgps_init_param *param)
 		request.prediction_count = count - num_valid;
 		request.prediction_period_min = period_min;
 
-		err = pgps_request(&request);
+		if (IS_ENABLED(CONFIG_NRF_CLOUD_PGPS_REQUEST_MISSING_UPON_INIT)) {
+			err = pgps_request(&request);
+		} else {
+			err = 0;
+		}
 	} else if ((count - (pnum + 1)) < REPLACEMENT_THRESHOLD) {
 		/* Replace expired predictions with newer.
 		 * The function will emit the request as a PGPS_EVT_REQUEST if

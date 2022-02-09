@@ -22,6 +22,13 @@ config NRF_CLOUD_PGPS_REQUEST_ALL_UPON_INIT
 	  If this option is enabled, all available P-GPS data will be requested from cloud when
 	  the library is initialized given that no P-GPS data has previously been stored to flash.
 
+config NRF_CLOUD_PGPS_REQUEST_MISSING_UPON_INIT
+	bool "Request missing P-GPS data upon initialization"
+	default y
+	help
+	  If this option is enabled, all missing predictions will be replaced upon initialization
+	  of the library. This requires that a cloud connection has been established.
+
 config NRF_CLOUD_PGPS_PREDICTION_PERIOD
 	int "Desired time in minutes between predictions."
 	range 60 480
