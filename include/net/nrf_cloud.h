@@ -95,6 +95,8 @@ enum nrf_cloud_evt_type {
 	NRF_CLOUD_EVT_READY,
 	/** The device received data from the cloud. */
 	NRF_CLOUD_EVT_RX_DATA,
+	/** The device has received a ping response from the cloud. */
+	NRF_CLOUD_EVT_PINGRESP,
 	/** The data sent to the cloud was acknowledged. */
 	NRF_CLOUD_EVT_SENSOR_DATA_ACK,
 	/** The transport was disconnected. */
