@@ -97,6 +97,10 @@ nRF9160: Serial LTE Modem
   * Enhanced the #XSLEEP AT command to support data indication when idle.
   * Enhanced the MQTT client to support the reception of large PUBLISH payloads.
 
+* Added:
+
+  * Support for QoS library used to handle multiple in-flight messages for MQTT based cloud backends such as AWS IoT, Azure IoT Hub and nRF Cloud.
+
 nRF Desktop
 -----------
 
