@@ -306,6 +306,8 @@ struct nrf_cloud_tx_data {
 	enum nrf_cloud_topic_type topic_type;
 	/** Quality of Service of the message. */
 	enum mqtt_qos qos;
+	/** Message ID */
+	uint32_t id;
 };
 
 /**@brief Controls which values are added to the FOTA array in the "serviceInfo" shadow section */
