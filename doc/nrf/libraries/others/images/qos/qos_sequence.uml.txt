@@ -1,0 +1,95 @@
+	title QoS library implementation sequence diagram
+
+bottomparticipants
+
+participant "Transport library" as trans
+participant "Application" as app
+participant "QoS" as qos
+participant "List" as list
+participant "Kernel" as kernel
+
+
+
+
+fontfamily Consolas
+autoactivation on
+
+activate app
+
+# Initialize QoS library
+
+app->qos:qos_init(handler)
+app<--qos:Return value
+
+# Single QoS 1 message unACK
+
+app->qos:qos_add_message(message)
+qos->list:list_append(message)
+qos<--list: Return value
+qos->kernel:k_work_reschedule(delayed_work, backoff)
+kernel-->qos:Return value
+qos->app:QOS_EVT_MESSAGE_NEW
+
+app->trans:transport_send(message)
+trans-->app: Return value
+
+
+app-->qos:
+qos-->app:Return value
+
+
+
+trans->app: TRANSPORT_MESSAGE_ACKNOWLEDGED
+
+app->qos:qos_message_remove(id)
+
+qos->list:list_remove(id)
+list-->qos:Return value
+
+qos->kernel:k_work_cancel_delayable(delayed_work)
+kernel-->qos:Return value
+qos-->app:Return value
+app-->trans:
+
+# Single QoS 1 message ACKed
+
+group Single unACKed message
+
+app->qos:qos_add_message(message)
+qos->list:list_append(message)
+qos<--list: Return value
+qos->kernel:k_work_reschedule(delayed_work, backoff)
+kernel-->qos:Return value
+qos->app:QOS_EVT_MESSAGE_NEW
+
+app->trans:transport_send(message)
+trans-->app: Return value
+
+
+app-->qos:
+qos-->app:Return value
+
+
+kernel->kernel:k_work_timer_expire
+kernel->qos:timeout_handler_work_fn()
+
+qos->app:QOS_EVT_MESSAGE_EXPIRED
+
+app->trans:transport_send(message)
+trans-->app: Return value
+app-->qos:
+qos-->kernel:
+
+trans->app: TRANSPORT_MESSAGE_ACKNOWLEDGED
+
+app->qos:qos_message_remove(id)
+
+qos->list:list_remove(id)
+list-->qos:Return value
+
+qos->kernel:k_work_cancel_delayable(delayed_work)
+kernel-->qos:Return value
+qos-->app:Return value
+app-->trans:
+
+end
