@@ -773,6 +773,14 @@ static void on_state_lte_connected(struct cloud_msg_data *msg)
 	if (IS_EVENT(msg, modem, MODEM_EVT_CARRIER_FOTA_STOPPED)) {
 		connect_cloud();
 	}
+
+	/* With nRF Cloud, the device shadow is requested and handled automatically before the
+	 * application is notified that nRF Cloud is connected. Due to this we allow
+	 * sending/acknowledgning of device configurations in STATE_LTE_CONNECTED.
+	 */
+	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_SEND)) {
+		config_send(&msg->module.data);
+	}
 }
 
 /* Message handler for STATE_LTE_DISCONNECTED. */
@@ -807,10 +815,6 @@ static void on_sub_state_cloud_connected(struct cloud_msg_data *msg)
 
 	if (IS_EVENT(msg, data, DATA_EVT_DATA_SEND)) {
 		data_send(&msg->module.data);
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_SEND)) {
-		config_send(&msg->module.data);
 	}
 
 	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_GET)) {

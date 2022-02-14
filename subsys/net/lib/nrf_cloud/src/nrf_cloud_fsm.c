@@ -204,7 +204,7 @@ static int handle_device_config_update(const struct nct_evt *const evt,
 	}
 
 	if (*config_found == false) {
-		return 0;
+		goto notify;
 	}
 
 	if (msg.data.ptr) {
@@ -216,6 +216,7 @@ static int handle_device_config_update(const struct nct_evt *const evt,
 		}
 	}
 
+notify:
 	cloud_evt.data = evt->param.cc->data;
 	cloud_evt.topic = evt->param.cc->topic;
 
