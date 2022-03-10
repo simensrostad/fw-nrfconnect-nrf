@@ -530,6 +530,8 @@ int cloud_wrap_memfault_data_send(char *buf, size_t len)
 		.topic = pub_topics[APP_PUB_TOPIC_IDX_MEMFAULT]
 	};
 
+	LOG_WRN("SENDING MEMFAULT DATA TO: %s", msg.topic.str);
+
 	err = aws_iot_send(&msg);
 	if (err) {
 		LOG_ERR("aws_iot_send, error: %d", err);

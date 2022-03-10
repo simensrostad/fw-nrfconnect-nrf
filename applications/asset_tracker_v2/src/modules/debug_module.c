@@ -54,14 +54,27 @@ static void memfault_internal_send(void)
 	while (true) {
 		k_sem_take(&mflt_internal_send_sem, K_FOREVER);
 
-		/* Because memfault_zephyr_port_post_data() can block for a long time we cannot
-		 * call it from the system workqueue.
-		 */
-		memfault_zephyr_port_post_data();
+		uint8_t data[CONFIG_DEBUG_MODULE_MEMFAULT_CHUNK_SIZE_MAX];
+		size_t len = sizeof(data);
+
+		while (memfault_packetizer_get_chunk(data, &len)) {
+			struct debug_module_event *debug_module_event = new_debug_module_event();
+
+			debug_module_event->type = DEBUG_EVT_MEMFAULT_DATA_READY;
+			debug_module_event->data.memfault.len = len;
+
+			BUILD_ASSERT(sizeof(debug_module_event->data.memfault.buf) >= sizeof(data));
+			memcpy(debug_module_event->data.memfault.buf, data,
+			       sizeof(debug_module_event->data.memfault.buf));
+
+			k_sleep(K_SECONDS(1));
+
+			EVENT_SUBMIT(debug_module_event);
+		}
 	}
 }
 
-K_THREAD_DEFINE(mflt_send_thread, CONFIG_DEBUG_MODULE_MEMFAULT_THREAD_STACK_SIZE,
+K_THREAD_DEFINE(mflt_send_thread, 8192,
 		memfault_internal_send, NULL, NULL, NULL,
 		K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);
 
@@ -195,50 +208,14 @@ static void watchdog_handler(const struct watchdog_evt *evt)
 }
 #endif /* defined(CONFIG_WATCHDOG_APPLICATION) */
 
-/**
- * @brief Send Memfault data. Memfault data should always be sent over the internal HTTP transport
- *	  upon a connection to LTE. This is to not be dependent on a cloud connection for critical
- *	  data such as coredumps. For regular metric updates the transport can be selected by
- *	  setting CONFIG_DEBUG_MODULE_MEMFAULT_USE_EXTERNAL_TRANSPORT.
- *
- * @param[in] lte_connected Flag set when the debug module is notified that an LTE connection
- *			    has been established.
- */
-static void send_memfault_data(bool lte_connected)
+static void send_memfault_data()
 {
 	bool data_available = memfault_packetizer_data_available();
 
-	if (lte_connected && data_available) {
-		k_sem_give(&mflt_internal_send_sem);
-		return;
-	}
-
-#if defined(CONFIG_DEBUG_MODULE_MEMFAULT_USE_EXTERNAL_TRANSPORT)
-	if (data_available) {
-		uint8_t data[CONFIG_DEBUG_MODULE_MEMFAULT_CHUNK_SIZE_MAX];
-		size_t len = sizeof(data);
-
-		while (memfault_packetizer_get_chunk(data, &len)) {
-			struct debug_module_event *debug_module_event = new_debug_module_event();
-
-			debug_module_event->type = DEBUG_EVT_MEMFAULT_DATA_READY;
-			debug_module_event->data.memfault.len = len;
-
-			BUILD_ASSERT(sizeof(debug_module_event->data.memfault.buf) >= sizeof(data));
-			memcpy(debug_module_event->data.memfault.buf, data,
-			       sizeof(debug_module_event->data.memfault.buf));
-
-			EVENT_SUBMIT(debug_module_event);
-		}
-	}
-
-	return;
-#else
 	if (data_available) {
 		/* Offload sending of Memfault data to a dedicated thread. */
 		k_sem_give(&mflt_internal_send_sem);
 	}
-#endif /* if defined(CONFIG_DEBUG_MODULE_MEMFAULT_USE_EXTERNAL_TRANSPORT) */
 }
 
 static void add_gnss_metrics(uint8_t satellites, uint32_t search_time,
@@ -293,20 +270,9 @@ static void memfault_handle_event(struct debug_msg_data *msg)
 	 * should preferably be sent within the same LTE RRC connected window.
 	 */
 	if ((IS_EVENT(msg, data, DATA_EVT_DATA_SEND)) ||
-	    (IS_EVENT(msg, data, DATA_EVT_DATA_SEND_BATCH))) {
-		send_memfault_data(false);
-		return;
-	}
-
-	/* When the device connects to LTE, the debug module will check if there is available
-	 * Memfault data and send it before the application connects to cloud. If Memfault data
-	 * has been stored prior to receiving an LTE connected event, there is the likelihood
-	 * that the data is a coredump from a previous crash. This data must be prioritized and
-	 * should not depend on a connection to cloud. Due to a limitation of maximum 1 TLS
-	 * handshake occur at the time, this will cause the first cloud connection attempt to fail.
-	 */
-	if (IS_EVENT(msg, modem, MODEM_EVT_LTE_CONNECTED)) {
-		send_memfault_data(true);
+	    (IS_EVENT(msg, data, DATA_EVT_DATA_SEND_BATCH)) ||
+	    (IS_EVENT(msg, cloud, CLOUD_EVT_CONNECTED))) {
+		send_memfault_data();
 		return;
 	}
 
