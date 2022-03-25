@@ -101,7 +101,7 @@ static struct cloud_data_cfg copy_cfg;
 const k_tid_t cloud_module_thread;
 
 /* Register message IDs that are used with the QoS library. */
-QOS_MESSAGE_TYPES_REGISTER(GENERIC, BATCH, UI, NEIGHBOR_CELLS, AGPS_REQUEST, CONFIG);
+QOS_MESSAGE_TYPES_REGISTER(GENERIC, BATCH, UI, NEIGHBOR_CELLS, AGPS_REQUEST, PGPS_REQUEST, CONFIG);
 
 #if defined(CONFIG_NRF_CLOUD_PGPS)
 /* Local copy of the last A-GPS request from the modem, used to inject correct P-GPS data. */
@@ -132,6 +132,8 @@ static struct module_data self = {
 /* Forward declarations. */
 static void connect_check_work_fn(struct k_work *work);
 static void send_config_received(void);
+static void message_add(uint8_t *ptr, size_t len, uint8_t type,
+			uint32_t flags, bool heap_allocated);
 
 /* Convenience functions used in internal state handling. */
 static char *state2str(enum state_type state)
@@ -414,7 +416,7 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 				evt->message_id);
 		} else if (err) {
 			LOG_ERR("qos_message_remove, error: %d", err);
-			SEND_ERROR(cloud, CLOUD_EVT_FOTA_ERROR, err);
+			SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
 		}
 
 		break;
@@ -467,25 +469,6 @@ static void send_config_received(void)
 
 	EVENT_SUBMIT(cloud_module_event);
 }
-
-#if defined(CONFIG_NRF_CLOUD_PGPS)
-static void pgps_request_send(struct cloud_codec_data *data)
-{
-	int err;
-
-	err = cloud_wrap_pgps_request_send(data->buf, data->len);
-	cloud_codec_release_data(data);
-
-	if (err == -ENOTSUP) {
-		LOG_DBG("Sending of P-GPS request is not supported by the "
-			"configured cloud library");
-	} else if (err) {
-		LOG_ERR("cloud_wrap_pgps_request_send, err: %d", err);
-	} else {
-		LOG_DBG("P-GPS request sent");
-	}
-}
-#endif
 
 static void connect_cloud(void)
 {
@@ -578,9 +561,11 @@ void pgps_handler(struct nrf_cloud_pgps_event *event)
 		switch (err) {
 		case 0:
 			LOG_DBG("P-GPS request encoded successfully");
-
-			/* This function frees the allocated JSON string buffer */
-			pgps_request_send(&output);
+			message_add(output.buf,
+				    output.len,
+				    PGPS_REQUEST,
+				    QOS_FLAG_RELIABILITY_ACK_REQUIRED,
+				    true);
 			break;
 		case -ENOTSUP:
 			/* PGPS request encoding is not supported */
@@ -618,7 +603,7 @@ static void message_add(uint8_t *ptr, size_t len, uint8_t type, uint32_t flags, 
 	};
 
 	err = qos_message_add(&message);
-	if (err && err != ENOMEM) {
+	if (err && err != -ENOMEM) {
 		LOG_ERR("qos_message_add, error: %d", err);
 		SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
 		return;
@@ -904,6 +889,15 @@ static void on_sub_state_cloud_connected(struct cloud_msg_data *msg)
 							   msg->module.cloud.data.message.id);
 			if (err) {
 				LOG_WRN("cloud_wrap_agps_request_send, err: %d", err);
+			}
+			break;
+		case PGPS_REQUEST:
+			err = cloud_wrap_pgps_request_send(message->buf,
+							   message->len,
+							   ack,
+							   msg->module.cloud.data.message.id);
+			if (err) {
+				LOG_WRN("cloud_wrap_pgps_request_send, err: %d", err);
 			}
 			break;
 		case CONFIG:

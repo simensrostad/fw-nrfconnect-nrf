@@ -1132,6 +1132,8 @@ int aws_iot_send(const struct aws_iot_data *const tx_data)
 	param.message.topic.topic.size	= tx_data_pub.topic.len;
 	param.message.payload.data	= tx_data_pub.ptr;
 	param.message.payload.len	= tx_data_pub.len;
+	param.dup_flag			= tx_data_pub.dup_flag;
+	param.retain_flag		= tx_data_pub.retain_flag;
 
 	/* If the message ID has not been set by the application, a random message ID is assigned
 	 * to the packet.

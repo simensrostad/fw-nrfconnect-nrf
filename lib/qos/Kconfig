@@ -5,7 +5,7 @@
 #
 
 menuconfig QOS
-	bool "Qos library"
+	bool "QoS library"
 
 if QOS
 

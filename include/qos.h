@@ -74,7 +74,7 @@ enum qos_evt_type {
 	 *
 	 *  If the heap_allocated flag is set in the @ref qos_data message structure
 	 *  the corresponding buffer (message.data) must be freed.
-	 *  Payload is of type  @ref qos_data.
+	 *  Payload is of type @ref qos_data.
 	 */
 	QOS_EVT_MESSAGE_REMOVED_FROM_LIST,
 
@@ -82,7 +82,7 @@ enum qos_evt_type {
 	 *  number of retries.
 	 *
 	 *  This will cause library to reset its internal retry_count variable that is used to
-	 *  index an internal timeout backoff table. This will reset the backoff the lowest
+	 *  index an internal timeout backoff table. This will reset the backoff to the lowest
 	 *  initial value.
 	 */
 	QOS_EVT_RETRY_COUNT_EXPIRED,
@@ -99,7 +99,7 @@ struct qos_payload {
 /** @brief Structure that contains the message payload and corresponding metadata. */
 struct qos_data {
 	/** Flags associated with the message.
-	 *  see @ref qos_flag_bitmask for documentation on the various flags that can be set.
+	 *  See @ref qos_flag_bitmask for documentation on the various flags that can be set.
 	 */
 	uint32_t flags;
 

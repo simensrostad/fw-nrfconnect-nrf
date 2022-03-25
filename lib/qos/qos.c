@@ -6,16 +6,15 @@
 
 #include <zephyr.h>
 #include <sys/slist.h>
-
-#include "qos.h"
+#include <qos.h>
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(qos, CONFIG_QOS_LOG_LEVEL);
 
 #define INVALID -1
 
-/* Lookup table for QoS backoff messages. */
-uint32_t backoff_delay_lookup_sec[] = {
+/* Lookup table for QoS backoff timeouts. */
+static uint32_t backoff_delay_lookup_sec[] = {
 	16, 32, 64
 };
 
@@ -47,7 +46,7 @@ static struct ctx {
 	/* Variable used to prevent multiple library initializations. */
 	bool initialized;
 
-	/* Delayed work usd to schedule a backoff timer. */
+	/* Delayed work used as the backoff timer. */
 	struct k_work_delayable timeout_handler_work;
 } ctx;
 
@@ -96,6 +95,8 @@ static int timer_start(void)
 			return -ERANGE;
 		}
 
+		ctx.retry_count++;
+
 		k_work_reschedule(&ctx.timeout_handler_work, K_SECONDS(timeout));
 	}
 
@@ -104,16 +105,21 @@ static int timer_start(void)
 
 static void timeout_handler_work_fn(struct k_work *work)
 {
-	int timeout;
+	int timeout = timeout_get();
 
-	/* Notify all messages that are present in internal pending list. */
-	qos_message_notify_all();
-
-	timeout = timeout_get();
 	if (timeout < 0) {
 		LOG_WRN("Maximum retries reached, abort message notification");
 		return;
 	}
+
+	/* Notify all messages that are present in the internal pending list.
+	 * Only if we get a valid timeout from timeout_get(). If timeout_get() returns a negative
+	 * value, the event QOS_EVT_RETRY_COUNT_EXPIRED is notified that can trigger removal of
+	 * all pending messages. There should not be messages in-flight in case that happens.
+	 */
+	qos_message_notify_all();
+
+	ctx.retry_count++;
 
 	k_work_reschedule(&ctx.timeout_handler_work, K_SECONDS(timeout));
 }
@@ -175,7 +181,7 @@ static int list_remove(uint32_t id)
 int qos_init(qos_evt_handler_t evt_handler)
 {
 	if (evt_handler == NULL) {
-		LOG_DBG("Handler is NULL");
+		LOG_ERR("Handler is NULL");
 		return -EINVAL;
 	}
 
@@ -205,7 +211,7 @@ int qos_message_add(struct qos_data *message)
 	k_mutex_lock(&ctx_lock, K_FOREVER);
 
 	if (message == NULL) {
-		LOG_WRN("Message cannot be NULL");
+		LOG_ERR("Message cannot be NULL");
 		err = -EINVAL;
 		goto exit;
 	}
@@ -255,7 +261,7 @@ int qos_message_remove(uint32_t id)
 	 * and clear the retry counter.
 	 */
 	if (sys_slist_is_empty(&ctx.pending_list)) {
-		LOG_WRN("QoS list is empty!");
+		LOG_DBG("QoS list is empty!");
 		ctx.retry_count = 0;
 		k_work_cancel_delayable(&ctx.timeout_handler_work);
 	}
@@ -283,7 +289,7 @@ bool qos_message_has_flag(const struct qos_data *message, uint32_t flag)
 
 uint16_t qos_message_id_get_next(void)
 {
-	if (message_id_next > UINT16_MAX) {
+	if (message_id_next == UINT16_MAX) {
 		message_id_next = QOS_MESSAGE_ID_BASE;
 	}
 
@@ -308,7 +314,7 @@ void qos_message_notify_all(void)
 
 void qos_message_remove_all(void)
 {
-	struct qos_metadata *node = NULL, *next_node = NULL, *node_prev = NULL;
+	struct qos_metadata *node = NULL, *next_node = NULL;
 	struct qos_evt evt = {
 		.type = QOS_EVT_MESSAGE_REMOVED_FROM_LIST,
 	};
@@ -317,8 +323,7 @@ void qos_message_remove_all(void)
 		evt.message = node->message;
 		notify_event(&evt);
 		memset(&node->message, 0, sizeof(struct qos_data));
-		sys_slist_remove(&ctx.pending_list, &node_prev->header, &node->header);
-		node_prev = node;
+		sys_slist_remove(&ctx.pending_list, NULL, &node->header);
 	};
 
 	qos_timer_reset();
