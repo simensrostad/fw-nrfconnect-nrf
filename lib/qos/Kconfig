@@ -13,6 +13,10 @@ config QOS_PENDING_MESSAGES_MAX
 	int "Maximum amount of pending messages"
 	default 20
 
+config QOS_MESSAGE_NOTIFIED_COUNT_MAX
+	int "Maximum number of times to resend a message"
+	default 20
+
 endif # QOS
 
 module = QOS

@@ -152,6 +152,8 @@ int qos_init(qos_evt_handler_t evt_handler);
 /** @brief Add a message to the library. If the message fails to be added to the internal list
  *	   because the list is full, the message will be notified with the
  *	   QOS_EVT_MESSAGE_REMOVED_FROM_LIST event, so that it can be freed if heap allocated.
+ *	   When this API is called, the event QOS_EVT_MESSAGE_NEW is always notified with the
+ *	   corresponding message.
  *
  *  @param message Pointer to the corresponding message
  *

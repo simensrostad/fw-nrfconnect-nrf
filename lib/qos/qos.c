@@ -58,9 +58,14 @@ static uint16_t message_id_next = QOS_MESSAGE_ID_BASE;
 
 /* Internal API functions */
 
-static void notify_event(const struct qos_evt *evt)
+static void notify_event(struct qos_evt *evt)
 {
 	__ASSERT(evt != NULL, "Library event not found");
+
+	if ((evt->type == QOS_EVT_MESSAGE_NEW) ||
+	    (evt->type == QOS_EVT_MESSAGE_TIMER_EXPIRED)) {
+		    evt->message.notified_count++;
+	}
 
 	if (ctx.app_evt_handler != NULL) {
 		ctx.app_evt_handler(evt);
@@ -227,7 +232,6 @@ int qos_message_add(struct qos_data *message)
 			goto exit;
 		}
 
-		ctx.list_internal[ret].message.notified_count++;
 		notify_event(&evt);
 	} else {
 		notify_event(&evt);
@@ -306,7 +310,6 @@ void qos_message_notify_all(void)
 	};
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&ctx.pending_list, node, next_node, header) {
-		node->message.notified_count++;
 		evt.message = node->message;
 		notify_event(&evt);
 	};
