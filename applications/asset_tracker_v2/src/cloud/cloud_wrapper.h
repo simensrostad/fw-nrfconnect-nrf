@@ -125,7 +125,7 @@ int cloud_wrap_disconnect(void);
  * @brief Request device state from cloud. The device state contains the device configuration.
  *
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */
@@ -137,7 +137,7 @@ int cloud_wrap_state_get(bool ack, uint32_t id);
  * @param[in] buf Pointer to buffer containing data to be sent.
  * @param[in] len Length of buffer.
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */
@@ -149,7 +149,7 @@ int cloud_wrap_state_send(char *buf, size_t len, bool ack, uint32_t id);
  * @param[in] buf Pointer to buffer containing data to be sent.
  * @param[in] len Length of buffer.
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */
@@ -161,7 +161,7 @@ int cloud_wrap_data_send(char *buf, size_t len, bool ack, uint32_t id);
  * @param[in] buf Pointer to buffer containing data to be sent.
  * @param[in] len Length of buffer.
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */
@@ -173,7 +173,7 @@ int cloud_wrap_batch_send(char *buf, size_t len, bool ack, uint32_t id);
  * @param[in] buf Pointer to buffer containing data to be sent.
  * @param[in] len Length of buffer.
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */
@@ -185,7 +185,7 @@ int cloud_wrap_ui_send(char *buf, size_t len, bool ack, uint32_t id);
  * @param[in] buf Pointer to buffer containing data to be sent.
  * @param[in] len Length of buffer.
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */
@@ -197,7 +197,7 @@ int cloud_wrap_neighbor_cells_send(char *buf, size_t len, bool ack, uint32_t id)
  * @param[in] buf Pointer to buffer containing data to be sent.
  * @param[in] len Length of buffer.
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */
@@ -209,7 +209,7 @@ int cloud_wrap_agps_request_send(char *buf, size_t len, bool ack, uint32_t id);
  * @param[in] buf Pointer to buffer containing data to be sent.
  * @param[in] len Length of buffer.
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */
@@ -221,7 +221,7 @@ int cloud_wrap_pgps_request_send(char *buf, size_t len, bool ack, uint32_t id);
  * @param[in] buf Pointer to buffer containing data to be sent.
  * @param[in] len Length of buffer.
  * @param[in] ack Flag signifying if the message should be acknowledged or not.
- * @param[in] id message ID.
+ * @param[in] id Message ID.
  *
  * @return 0 on success, or a negative error code on failure.
  */

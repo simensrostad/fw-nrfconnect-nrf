@@ -74,18 +74,9 @@ enum qos_evt_type {
 	 *
 	 *  If the heap_allocated flag is set in the @ref qos_data message structure
 	 *  the corresponding buffer (message.data) must be freed.
-	 *  Payload is of type  @ref qos_data.
+	 *  Payload is of type @ref qos_data.
 	 */
 	QOS_EVT_MESSAGE_REMOVED_FROM_LIST,
-
-	/** Event received when the library has reached the maximum
-	 *  number of retries.
-	 *
-	 *  This will cause library to reset its internal retry_count variable that is used to
-	 *  index an internal timeout backoff table. This will reset the backoff the lowest
-	 *  initial value.
-	 */
-	QOS_EVT_RETRY_COUNT_EXPIRED,
 };
 
 /** @brief Structure used to keep track of unACKed messages. */
@@ -99,14 +90,16 @@ struct qos_payload {
 /** @brief Structure that contains the message payload and corresponding metadata. */
 struct qos_data {
 	/** Flags associated with the message.
-	 *  see @ref qos_flag_bitmask for documentation on the various flags that can be set.
+	 *  See @ref qos_flag_bitmask for documentation on the various flags that can be set.
 	 */
 	uint32_t flags;
 
 	/** Message ID */
 	uint16_t id;
 
-	/** Number of times that the message has been notified by the library. */
+	/** Number of times that the message has been notified by the library. This count is not
+	 *  incremented for messages flagged with QOS_FLAG_RELIABILITY_ACK_DISABLED.
+	 */
 	uint16_t notified_count;
 
 	/** Type of the message.
@@ -152,6 +145,8 @@ int qos_init(qos_evt_handler_t evt_handler);
 /** @brief Add a message to the library. If the message fails to be added to the internal list
  *	   because the list is full, the message will be notified with the
  *	   QOS_EVT_MESSAGE_REMOVED_FROM_LIST event, so that it can be freed if heap allocated.
+ *	   When this API is called, the event QOS_EVT_MESSAGE_NEW is always notified with the
+ *	   corresponding message.
  *
  *  @param message Pointer to the corresponding message
  *
