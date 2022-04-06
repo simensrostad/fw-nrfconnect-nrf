@@ -11,6 +11,13 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(qos, CONFIG_QOS_LOG_LEVEL);
 
+/* Define a custom STATIC macro that exposes internal variables when unit testing. */
+#if defined(CONFIG_UNITY)
+#define STATIC
+#else
+#define STATIC static
+#endif
+
 /* Structure used to keep track of pending messages. Used in combination with a linked list. */
 struct qos_metadata {
 	/* Mandatory variable used to construct a linked list. */
@@ -21,7 +28,7 @@ struct qos_metadata {
 };
 
 /* Structure containing internal variables in the library.  */
-static struct ctx {
+STATIC struct ctx {
 	/* Library event handler. Used in callbacks to the caller. */
 	qos_evt_handler_t app_evt_handler;
 
