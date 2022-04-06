@@ -995,8 +995,7 @@ static void nct_mqtt_evt_handler(struct mqtt_client *const mqtt_client,
 		break;
 	}
 	case MQTT_EVT_PINGRESP: {
-		LOG_DBG("MQTT_EVT_PINGRESP: id = %d result = %d",
-			_mqtt_evt->param.puback.message_id, _mqtt_evt->result);
+		LOG_DBG("MQTT_EVT_PINGRESP");
 
 		evt.type = NCT_EVT_PINGRESP;
 		event_notify = true;

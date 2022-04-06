@@ -613,8 +613,6 @@ static void message_add(uint8_t *ptr, size_t len, uint8_t type, uint32_t flags, 
 
 static void qos_event_handler(const struct qos_evt *evt)
 {
-	int err;
-
 	switch (evt->type) {
 	case QOS_EVT_MESSAGE_NEW: {
 		LOG_DBG("QOS_EVT_MESSAGE_NEW");
@@ -649,8 +647,6 @@ static void qos_event_handler(const struct qos_evt *evt)
 		LOG_DBG("Unknown QoS handler event");
 		break;
 	}
-
-	(void)err;
 }
 
 /* If this work is executed, it means that the connection attempt was not

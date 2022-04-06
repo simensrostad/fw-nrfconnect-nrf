@@ -36,13 +36,15 @@ static struct ctx {
 
 	/* Delayed work used as the backoff timer. */
 	struct k_work_delayable timeout_handler_work;
-} ctx;
+
+	/* Internal variable used to generate message IDs. */
+	uint16_t message_id_next;
+} ctx = {
+	.message_id_next = QOS_MESSAGE_ID_BASE
+};
 
 /* Mutex used to protect internal library variables. */
 static K_MUTEX_DEFINE(ctx_lock);
-
-/* Internal variable used to generate message IDs. */
-static uint16_t message_id_next = QOS_MESSAGE_ID_BASE;
 
 /* Internal API functions */
 
@@ -50,9 +52,16 @@ static void notify_event(struct qos_evt *evt)
 {
 	__ASSERT(evt != NULL, "Library event not found");
 
+	/* Unlock and lock mutex before callback. This is to avoid a deadlock in case any of the
+	 * library API is called in the callback event.
+	 */
+	k_mutex_unlock(&ctx_lock);
+
 	if (ctx.app_evt_handler != NULL) {
 		ctx.app_evt_handler(evt);
 	}
+
+	k_mutex_lock(&ctx_lock, K_FOREVER);
 }
 
 static void timeout_handler_work_fn(struct k_work *work)
@@ -227,8 +236,11 @@ int qos_message_add(struct qos_data *message)
 		notify_event(&evt);
 	}
 
-	/* Start the internal timer if it is not running. */
-	if (!k_work_delayable_is_pending(&ctx.timeout_handler_work)) {
+	/* Start the internal timer if it is not running when there are messages in the
+	 * pending list.
+	 */
+	if (!k_work_delayable_is_pending(&ctx.timeout_handler_work) &&
+	    !sys_slist_is_empty(&ctx.pending_list)) {
 		k_work_reschedule(&ctx.timeout_handler_work,
 				  K_SECONDS(CONFIG_QOS_MESSAGE_NOTIFY_TIMEOUT_SECONDS));
 	}
@@ -279,13 +291,19 @@ bool qos_message_has_flag(const struct qos_data *message, uint32_t flag)
 
 uint16_t qos_message_id_get_next(void)
 {
-	if (message_id_next == UINT16_MAX) {
-		message_id_next = QOS_MESSAGE_ID_BASE;
+	uint16_t message_id_temp;
+
+	k_mutex_lock(&ctx_lock, K_FOREVER);
+
+	if (ctx.message_id_next == UINT16_MAX) {
+		ctx.message_id_next = QOS_MESSAGE_ID_BASE;
 	}
 
-	message_id_next++;
+	message_id_temp = ++ctx.message_id_next;
 
-	return message_id_next;
+	k_mutex_unlock(&ctx_lock);
+
+	return message_id_temp;
 }
 
 void qos_message_notify_all(void)

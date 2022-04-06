@@ -112,7 +112,7 @@ struct qos_data {
 	 */
 	uint8_t type;
 
-	/** Variable used to keep track of heap allocated payload. */
+	/** Variable to keep track of user-allocated payload. */
 	struct qos_payload data;
 
 	/** Flag signifying if the payload is heap allocated. When a message has been removed from
@@ -176,7 +176,10 @@ int qos_message_remove(uint32_t id);
  */
 bool qos_message_has_flag(const struct qos_data *message, uint32_t flag);
 
-/** @brief Function that prints the contents of a qos message structure. */
+/** @brief Function that prints the contents of a qos message structure.
+ *         This requires that the library log level is set to debug level.
+ *	   CONFIG_QOS_LOG_LEVEL_DBG=y
+ */
 void qos_message_print(const struct qos_data *message);
 
 /** @brief Generate message ID that counts from QOS_MESSAGE_ID_BASE message ID base.
