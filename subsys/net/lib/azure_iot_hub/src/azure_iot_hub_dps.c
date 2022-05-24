@@ -46,6 +46,7 @@ struct dps_reg_status {
 	enum dps_reg_state state;
 	struct k_work_delayable poll_work;
 	uint32_t retry;
+	uint32_t retry_count;
 	/* Add 1 to make sure null termination can be used */
 	char reg_id[CONFIG_AZURE_IOT_HUB_DEVICE_ID_MAX_LEN + 1];
 	char operation_id[DPS_OPERATION_ID_MAX_LEN];
@@ -113,6 +114,7 @@ static int dps_settings_handler(const char *key, size_t len,
 		}
 
 		dps_reg_status.state = DPS_STATE_REGISTERED;
+		dps_reg_status.retry_count = 0;
 
 		LOG_DBG("Azure IoT Hub hostname found, DPS not needed: %s",
 			log_strdup(dps_reg_status.assigned_hub));
@@ -182,7 +184,6 @@ static void dps_reg_status_work_fn(struct k_work *work)
 		.message.topic.qos = MQTT_QOS_1_AT_LEAST_ONCE,
 		.message_id = k_uptime_get_32(),
 	};
-	static uint32_t retry_count;
 	struct dps_reg_status *reg_status =
 		CONTAINER_OF(work, struct dps_reg_status, poll_work);
 	char topic[DPS_TOPIC_OPERATION_ID_MAX_LEN];
@@ -192,17 +193,18 @@ static void dps_reg_status_work_fn(struct k_work *work)
 		return;
 	}
 
-	retry_count++;
+	dps_reg_status.retry_count++;
 
-	if ((retry_count <= DPS_REG_STATUS_UPDATE_MAX_RETRIES) &&
+	if ((dps_reg_status.retry_count <= DPS_REG_STATUS_UPDATE_MAX_RETRIES) &&
 	    (reg_status->state == DPS_STATE_REGISTERING)) {
 		k_work_reschedule(
 			k_work_delayable_from_work(work),
 			K_SECONDS(reg_status->retry));
-	} else if (retry_count > DPS_REG_STATUS_UPDATE_MAX_RETRIES) {
+	} else if (dps_reg_status.retry_count > DPS_REG_STATUS_UPDATE_MAX_RETRIES) {
 		LOG_ERR("DPS retry max count (%d) exceeded",
 			DPS_REG_STATUS_UPDATE_MAX_RETRIES);
 		reg_status->state = DPS_STATE_FAILED;
+		dps_reg_status.retry_count = 0;
 		cb_handler(reg_status->state);
 
 		return;
@@ -369,6 +371,7 @@ static void dps_parse_reg_update(struct topic_parser_data *topic, char *payload,
 			log_strdup(dps_reg_status.assigned_hub));
 
 		dps_reg_status.state = DPS_STATE_REGISTERED;
+		dps_reg_status.retry_count = 0;
 		cb_handler(dps_reg_status.state);
 		return;
 	} else if (topic->status != 202) {
@@ -520,6 +523,7 @@ int dps_start(void)
 			log_strdup(dps_reg_status.assigned_hub));
 
 		dps_reg_status.state = DPS_STATE_REGISTERED;
+		dps_reg_status.retry_count = 0;
 
 		return -EALREADY;
 	}
