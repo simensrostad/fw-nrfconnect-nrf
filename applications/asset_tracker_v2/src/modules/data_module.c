@@ -154,11 +154,21 @@ static struct module_data self = {
 static void data_send_work_fn(struct k_work *work);
 static int config_settings_handler(const char *key, size_t len,
 				   settings_read_cb read_cb, void *cb_arg);
+static int on_settings_loaded(void);
 static void new_config_handle(struct cloud_data_cfg *new_config);
 
 /* Static handlers */
 SETTINGS_STATIC_HANDLER_DEFINE(MODULE, DEVICE_SETTINGS_KEY, NULL,
-			       config_settings_handler, NULL, NULL);
+			       config_settings_handler, on_settings_loaded, NULL);
+
+static int on_settings_loaded(void)
+{
+	LOG_WRN("Settings fully loaded");
+
+	k_sem_give(&config_load_sem);
+
+	return 0;
+}
 
 /* Convenience functions used in internal state handling. */
 static char *state2str(enum state_type new_state)
@@ -374,7 +384,6 @@ static int config_settings_handler(const char *key, size_t len,
 		}
 	}
 
-	k_sem_give(&config_load_sem);
 	return err;
 }
 
@@ -447,7 +456,7 @@ static int setup(void)
 	 * to flash, if any.
 	 */
 	if (k_sem_take(&config_load_sem, K_SECONDS(1)) != 0) {
-		LOG_DBG("Failed retrieveing the device configuration from flash in time");
+		LOG_DBG("Failed retrieving the device configuration from flash in time");
 	}
 
 	err = cloud_codec_init(&current_cfg, cloud_codec_event_handler);
