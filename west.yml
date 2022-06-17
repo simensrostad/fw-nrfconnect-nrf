@@ -31,6 +31,8 @@ manifest:
       url-base: https://github.com/NordicSemiconductor
     - name: memfault
       url-base: https://github.com/memfault
+    - name: aws
+      url-base: https://github.com/aws
 
   # If not otherwise specified, the projects below should be obtained
   # from the ncs remote.
@@ -177,6 +179,10 @@ manifest:
       revision: 9f6b3812237fbb0d4157ba3584c13f1644fcbe3a
       groups:
       - nrf5340_audio
+    - name: device-shadow-for-aws-iot-embedded-sdk
+      path: modules/lib/device-shadow-for-aws-iot-embedded-sdk
+      revision: 92327cd715ddbab04f1d88837f7bc66010b2dfa5
+      remote: aws
 
   # West-related configuration for the nrf repository.
   self:

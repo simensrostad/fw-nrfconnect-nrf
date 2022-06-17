@@ -7,6 +7,7 @@
 #include <net/aws_iot.h>
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/socket.h>
+#include <shadow.h>
 #include <stdio.h>
 
 #if defined(CONFIG_AWS_FOTA)
