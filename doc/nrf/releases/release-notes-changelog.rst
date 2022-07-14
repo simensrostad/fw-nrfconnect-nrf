@@ -478,7 +478,7 @@ Libraries for networking
 
   * :ref:`lib_azure_iot_hub` library:
 
-    * The library has been reworked to use :ref:`Azure SDK for Embedded C`.
+    * The library has been reworked to use `Azure SDK for Embedded C`_.
     * The APIs for both IoT Hub and DPS interaction have changed and the applications and samples that use the library have been updated.
 
 Libraries for NFC

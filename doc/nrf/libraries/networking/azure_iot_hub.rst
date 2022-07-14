@@ -17,7 +17,7 @@ When the device provisioning is complete, the library automatically connects to 
 The library also has integrated support for a proprietary FOTA solution.
 For more information on Azure FOTA, see the documentation on :ref:`lib_azure_fota` library and :ref:`azure_fota_sample` sample.
 
-The library uses :ref:`Azure SDK for Embedded C` for message processing and other operations.
+The library uses `Azure SDK for Embedded C`_ for message processing and other operations.
 
 .. important::
    If the server sends a device-bound message when the device is unavailable for a period of time, for instance while in LTE Power Saving Mode, the server will most likely terminate the TCP connection.
@@ -99,7 +99,8 @@ To connect to Azure IoT Hub without using DPS, complete the following minimum re
    The hostname can also be set at run time.
 #. Set the option :kconfig:option:`CONFIG_AZURE_IOT_HUB_DEVICE_ID` to the device ID.
    The device ID must match the device ID used while creating the certificates.
-   The device ID can also be set at run time.
+   The device ID can also be set at run time by populating the ``device_id`` member of the :c:struct:`azure_iot_hub_config` structure, passed into :c:func:`azure_iot_hub_connect` when connecting.
+   If the ``device_id.size`` buffer size is zero, the compile time option :kconfig:option:`CONFIG_AZURE_IOT_HUB_DEVICE_ID`` is used.
 #. Make sure that the device is already registered with your Azure IoT Hub, or follow the instructions in `Registering the device with Azure IoT Hub`_.
 #. Set :kconfig:option:`CONFIG_AZURE_IOT_HUB_SEC_TAG` to the security tag used in :ref:`azure_iot_hub_flash_certs`.
    Optionally, set :kconfig:option:`CONFIG_AZURE_IOT_HUB_SEC_TAG` if more than one server certificate is provisioned.

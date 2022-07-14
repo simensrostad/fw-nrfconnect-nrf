@@ -26,16 +26,16 @@
 
 LOG_MODULE_REGISTER(azure_iot_hub, CONFIG_AZURE_IOT_HUB_LOG_LEVEL);
 
-/* Define a custom STATIC macro that exposes internal variables when unit testing. */
+/* Define a custom AZ_HUB_STATIC macro that exposes internal variables when unit testing. */
 #if defined(CONFIG_UNITY)
-#define STATIC
+#define AZ_HUB_STATIC
 #else
-#define STATIC static
+#define AZ_HUB_STATIC static
 #endif
 
 static azure_iot_hub_evt_handler_t evt_handler;
 
-STATIC enum iot_hub_state {
+AZ_HUB_STATIC enum iot_hub_state {
 	/* The library is uninitialized. */
 	STATE_UNINIT,
 	/* The library is initialized, no connection established. */
@@ -60,16 +60,6 @@ static K_SEM_DEFINE(dps_sem, 0, 1);
 /* Azure SDK for Embedded C variables. */
 static az_iot_hub_client iot_hub_client;
 
-/* Build time asserts */
-
-/* Device ID source must be one of three for the library to work:
- *	- Kconfigured IoT hub device ID: CONFIG_AZURE_IOT_HUB_DEVICE_ID
- *	- Runtime app-provided device ID
- */
-BUILD_ASSERT(IS_ENABLED(CONFIG_AZURE_IOT_HUB_DEVICE_ID_APP) ||
-	     (sizeof(CONFIG_AZURE_IOT_HUB_DEVICE_ID) - 1 > 0),
-	     "Device ID must be set by Kconfig or application");
-
 /* Static functions */
 static void azure_iot_hub_notify_event(struct azure_iot_hub_evt *evt)
 {
@@ -91,7 +81,7 @@ static const char *state_name_get(enum iot_hub_state state)
 	}
 }
 
-STATIC void iot_hub_state_set(enum iot_hub_state new_state)
+AZ_HUB_STATIC void iot_hub_state_set(enum iot_hub_state new_state)
 {
 	bool notify_error = false;
 
@@ -119,7 +109,8 @@ STATIC void iot_hub_state_set(enum iot_hub_state new_state)
 		}
 		break;
 	case STATE_CONNECTED:
-		if (new_state != STATE_DISCONNECTING) {
+		if (new_state != STATE_DISCONNECTING &&
+		    new_state != STATE_DISCONNECTED) {
 			notify_error = true;
 		}
 		break;
@@ -221,7 +212,7 @@ static void device_twin_result_process(az_iot_hub_client_twin_response *twin_msg
 	switch (twin_msg->status) {
 	case AZ_IOT_STATUS_OK: {
 #if IS_ENABLED(CONFIG_AZURE_FOTA)
-		int err = azure_fota_msg_process(payload, payload_len);
+		int err = azure_fota_msg_process(payload.ptr, payload.size);
 
 		if (err < 0) {
 			LOG_ERR("Failed to process FOTA msg");
@@ -327,7 +318,7 @@ static bool direct_method_process(az_iot_hub_client_method_request *method_reque
 }
 
 // TODO: This function is very long, consider extracting parts to separate functions
-STATIC void on_publish(struct azure_iot_hub_buf topic, struct azure_iot_hub_buf payload)
+AZ_HUB_STATIC void on_publish(struct azure_iot_hub_buf topic, struct azure_iot_hub_buf payload)
 {
 	struct azure_iot_hub_property properties[CONFIG_AZURE_IOT_HUB_MSG_PROPERTY_RECV_MAX_COUNT];
 	struct azure_iot_hub_evt evt = {
@@ -435,9 +426,10 @@ STATIC void on_publish(struct azure_iot_hub_buf topic, struct azure_iot_hub_buf 
 
 		LOG_WRN("Unhandled direct method invocation");
 		return;
-	case AZURE_IOT_HUB_TOPIC_TWIN_DESIRED:
+	case AZURE_IOT_HUB_TOPIC_TWIN_DESIRED: {
 #if IS_ENABLED(CONFIG_AZURE_FOTA)
-		err = azure_fota_msg_process(payload.ptr, payload.size);
+		int err = azure_fota_msg_process(payload.ptr, payload.size);
+
 		if (err < 0) {
 			LOG_ERR("Failed to process FOTA message");
 		} else if (err == 1) {
@@ -449,6 +441,7 @@ STATIC void on_publish(struct azure_iot_hub_buf topic, struct azure_iot_hub_buf 
 		evt.type = AZURE_IOT_HUB_EVT_TWIN_DESIRED_RECEIVED;
 
 		azure_iot_hub_notify_event(&evt);
+	};
 		return;
 	case AZURE_IOT_HUB_TOPIC_TWIN_REQUEST_RESULT:
 		LOG_DBG("Device twin data received");
@@ -462,7 +455,7 @@ STATIC void on_publish(struct azure_iot_hub_buf topic, struct azure_iot_hub_buf 
 	azure_iot_hub_notify_event(&evt);
 }
 
-STATIC void on_connack(enum mqtt_conn_return_code return_code)
+AZ_HUB_STATIC void on_connack(enum mqtt_conn_return_code return_code)
 {
 	int err;
 	struct azure_iot_hub_evt evt = {
@@ -508,7 +501,7 @@ static void on_disconnect(int result)
 	azure_iot_hub_notify_event(&evt);
 }
 
-STATIC void on_puback(uint16_t message_id, int result)
+AZ_HUB_STATIC void on_puback(uint16_t message_id, int result)
 {
 	struct azure_iot_hub_evt evt = {
 		.type = AZURE_IOT_HUB_EVT_PUBACK,
@@ -518,7 +511,7 @@ STATIC void on_puback(uint16_t message_id, int result)
 	azure_iot_hub_notify_event(&evt);
 }
 
-STATIC void on_suback(uint16_t message_id, int result)
+AZ_HUB_STATIC void on_suback(uint16_t message_id, int result)
 {
 	struct azure_iot_hub_evt evt = {
 		.type = AZURE_IOT_HUB_EVT_READY,
@@ -541,7 +534,7 @@ static void on_pingresp(void)
 	azure_iot_hub_notify_event(&evt);
 }
 
-STATIC void on_error(enum mqtt_helper_error error)
+AZ_HUB_STATIC void on_error(enum mqtt_helper_error error)
 {
 	struct azure_iot_hub_evt evt = { 0 };
 
@@ -558,7 +551,7 @@ STATIC void on_error(enum mqtt_helper_error error)
 }
 
 /* The functions expects an already initialized az_iot_message_properties */
-STATIC int msg_properties_add(az_iot_message_properties * az_properties,
+AZ_HUB_STATIC int msg_properties_add(az_iot_message_properties * az_properties,
 			      struct azure_iot_hub_property *properties,
 			      size_t property_count)
 {
@@ -585,8 +578,8 @@ static void fota_report_send(struct azure_fota_event *evt)
 	int err;
 	struct azure_iot_hub_msg msg = {
 		.topic.type = AZURE_IOT_HUB_TOPIC_TWIN_REPORTED,
-		.ptr = evt->report,
-		.len = evt->report ? strlen(evt->report) : 0,
+		.payload.ptr = evt->report,
+		.payload.size = evt->report ? strlen(evt->report) : 0,
 	};
 
 	if (evt->report == NULL) {
@@ -671,6 +664,7 @@ static void dps_handler(enum azure_iot_hub_dps_reg_status state)
 	switch (state) {
 	case AZURE_IOT_HUB_DPS_REG_STATUS_NOT_STARTED:
 		LOG_DBG("AZURE_IOT_HUB_DPS_REG_STATUS_NOT_STARTED");
+		break;
 	case AZURE_IOT_HUB_DPS_REG_STATUS_ASSIGNED:
 		LOG_DBG("AZURE_IOT_HUB_DPS_REG_STATUS_ASSIGNED");
 		k_sem_give(&dps_sem);
@@ -680,6 +674,9 @@ static void dps_handler(enum azure_iot_hub_dps_reg_status state)
 		/* TODO: In case of failure, _start() will still wait for the sampehore to time out.
 		 *	 This can be improved to give feedbck to the app sooner.
 		 */
+		break;
+	case AZURE_IOT_HUB_DPS_REG_STATUS_ASSIGNING:
+		LOG_DBG("AZURE_IOT_HUB_DPS_REG_STATUS_ASSIGNING");
 		break;
 	default:
 		LOG_WRN("Unhandled DPS state: %d", state);
@@ -704,7 +701,8 @@ int azure_iot_hub_init(const azure_iot_hub_evt_handler_t event_handler)
 	}
 
 #if IS_ENABLED(CONFIG_AZURE_FOTA)
-	err = azure_fota_init(fota_evt_handler);
+	int err = azure_fota_init(fota_evt_handler);
+
 	if (err) {
 		LOG_ERR("Failed to initialize Azure FOTA, error: %d", err);
 		return err;

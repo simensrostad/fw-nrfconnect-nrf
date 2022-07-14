@@ -14,6 +14,12 @@
 #include <stdint.h>
 #include <net/azure_iot_hub.h>
 
+/**
+ * @defgroup azure_iot_hub_dps Azure IoT Hub DPS library
+ * @{
+ * @brief Library to connect a device to Azure IoT Hub Device Provisioning Service (DPS).
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif

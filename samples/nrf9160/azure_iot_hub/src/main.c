@@ -443,7 +443,7 @@ static void dps_handler(enum azure_iot_hub_dps_reg_status status)
 		k_sem_give(&dps_done_sem);
 		break;
 	case AZURE_IOT_HUB_DPS_REG_STATUS_FAILED:
-		printk("DPS registration status: AZURE_IOT_HUB_DPS_REG_STATUS_ASSIGNED\n");
+		printk("DPS registration status: AZURE_IOT_HUB_DPS_REG_STATUS_FAILED\n");
 
 		dps_was_successful = false;
 

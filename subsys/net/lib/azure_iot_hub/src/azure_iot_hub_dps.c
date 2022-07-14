@@ -21,18 +21,15 @@
 
 LOG_MODULE_REGISTER(azure_iot_hub_dps, CONFIG_AZURE_IOT_HUB_LOG_LEVEL);
 
-/* Define a custom STATIC macro that exposes internal variables when unit testing. */
+/* Define a custom AZ_DPS_STATIC macro that exposes internal variables when unit testing. */
 #if defined(CONFIG_UNITY)
-#define STATIC
+#define AZ_DPS_STATIC
 #else
-#define STATIC	static
+#define AZ_DPS_STATIC static
 #endif
 
-/* Convenience macro for logging of spans. */
-#define SPAN_LOG(_span)	az_span_size(_span), log_strdup(az_span_ptr(_span))
-
-STATIC enum dps_state dps_state = DPS_STATE_UNINIT;
-STATIC struct dps_reg_ctx dps_reg_ctx;
+AZ_DPS_STATIC enum dps_state dps_state = DPS_STATE_UNINIT;
+AZ_DPS_STATIC struct dps_reg_ctx dps_reg_ctx;
 static char operation_id_buf[CONFIG_AZURE_IOT_HUB_DPS_OPERATION_ID_BUFFER_SIZE];
 static char assigned_hub_buf[CONFIG_AZURE_IOT_HUB_DPS_HOSTNAME_MAX_LEN];
 static char assigned_device_id_buf[CONFIG_AZURE_IOT_HUB_DPS_DEVICE_ID_MAX_LEN];
@@ -161,7 +158,9 @@ static int dps_settings_handler(const char *key, size_t len,
 		dps_reg_ctx.assigned_hub = az_span_create(assigned_hub_buf,
 						MIN(sizeof(assigned_hub_buf), hostname_len));
 
-		LOG_DBG("Azure IoT Hub hostname found: %.*s", SPAN_LOG(dps_reg_ctx.assigned_hub));
+		LOG_DBG("Azure IoT Hub hostname found: %.*s",
+			az_span_size(dps_reg_ctx.assigned_hub),
+			log_strdup(az_span_ptr(dps_reg_ctx.assigned_hub)));
 	}
 
 	if (strcmp(key, DPS_SETTINGS_DEVICE_ID_LEN_KEY) == 0) {
@@ -189,13 +188,15 @@ static int dps_settings_handler(const char *key, size_t len,
 			az_span_create(assigned_device_id_buf,
 				       MIN(sizeof(assigned_device_id_buf), device_id_len));
 
-		LOG_DBG("Assigned device ID found: %.*s", SPAN_LOG(dps_reg_ctx.assigned_device_id));
+		LOG_DBG("Assigned device ID found: %.*s",
+			az_span_size(dps_reg_ctx.assigned_device_id),
+			log_strdup(az_span_ptr(dps_reg_ctx.assigned_device_id)));
 	}
 
 	return 0;
 }
 
-STATIC int dps_save_hostname(char *hostname_ptr, size_t hostname_len)
+AZ_DPS_STATIC int dps_save_hostname(char *hostname_ptr, size_t hostname_len)
 {
 	int err;
 	size_t buf_hostname_len = MIN(sizeof(assigned_hub_buf) - 1, hostname_len);
@@ -218,12 +219,14 @@ STATIC int dps_save_hostname(char *hostname_ptr, size_t hostname_len)
 	}
 
 	LOG_DBG("Assigned IoT Hub updated (size: %d): %.*s",
-		az_span_size(dps_reg_ctx.assigned_hub), SPAN_LOG(dps_reg_ctx.assigned_hub));
+		az_span_size(dps_reg_ctx.assigned_hub),
+		az_span_size(dps_reg_ctx.assigned_hub),
+		log_strdup(az_span_ptr(dps_reg_ctx.assigned_hub)));
 
 	return 0;
 }
 
-STATIC int dps_save_device_id(char *device_id_ptr, size_t device_id_len)
+AZ_DPS_STATIC int dps_save_device_id(char *device_id_ptr, size_t device_id_len)
 {
 	int err;
 	size_t buf_device_id_len = MIN(sizeof(assigned_device_id_buf) - 1, device_id_len);
@@ -247,7 +250,8 @@ STATIC int dps_save_device_id(char *device_id_ptr, size_t device_id_len)
 
 	LOG_DBG("Assigned device ID updated (size: %d): %.*s",
 		az_span_size(dps_reg_ctx.assigned_device_id),
-		SPAN_LOG(dps_reg_ctx.assigned_device_id));
+		az_span_size(dps_reg_ctx.assigned_device_id),
+		log_strdup(az_span_ptr(dps_reg_ctx.assigned_device_id)));
 
 	return 0;
 }
@@ -310,7 +314,7 @@ static bool dps_is_assigned(az_iot_provisioning_client_register_response *msg)
  *
  * @param msg can be NULL if the failure might not be contained within the message.
  */
-STATIC void on_reg_completed(az_iot_provisioning_client_register_response *msg)
+AZ_DPS_STATIC void on_reg_completed(az_iot_provisioning_client_register_response *msg)
 {
 	int err;
 	char *hostname_ptr;
@@ -367,9 +371,11 @@ STATIC void on_reg_completed(az_iot_provisioning_client_register_response *msg)
 		LOG_ERR("Failed to save device ID to flash, error: %d", err);
 	}
 
-	LOG_INF("Device ID %.*s is now registered to %.*s",
-		SPAN_LOG(dps_reg_ctx.reg_id),
-		SPAN_LOG(dps_reg_ctx.assigned_hub));
+	LOG_DBG("Device ID %.*s is now registered to %.*s",
+		az_span_size(dps_reg_ctx.reg_id),
+		log_strdup(az_span_ptr(dps_reg_ctx.reg_id)),
+		az_span_size(dps_reg_ctx.assigned_hub),
+		log_strdup(az_span_ptr(dps_reg_ctx.assigned_hub)));
 
 	dps_reg_ctx.status = AZURE_IOT_HUB_DPS_REG_STATUS_ASSIGNED;
 	dps_reg_ctx.cb(dps_reg_ctx.status);
@@ -526,7 +532,9 @@ static void handle_reg_update(az_span topic_span, az_span payload_span)
 	dps_reg_ctx.operation_id = az_span_slice(dps_reg_ctx.operation_id, 0,
 						 az_span_size(msg.operation_id));
 
-	LOG_DBG("Operation ID: %.*s", SPAN_LOG(dps_reg_ctx.operation_id));
+	LOG_DBG("Operation ID: %.*s",
+		az_span_size(dps_reg_ctx.operation_id),
+		log_strdup(az_span_ptr(dps_reg_ctx.operation_id)));
 
 	dps_reg_ctx.cb(dps_reg_ctx.status);
 
@@ -553,7 +561,9 @@ static int dps_id_scope_set(struct azure_iot_hub_buf id_scope)
 
 	dps_reg_ctx.id_scope = az_span_create(id, id_len);
 
-	LOG_INF("Setting DPS ID scope: %.*s", SPAN_LOG(dps_reg_ctx.id_scope));
+	LOG_DBG("Setting DPS ID scope: %.*s",
+		az_span_size(dps_reg_ctx.id_scope),
+		log_strdup(az_span_ptr(dps_reg_ctx.id_scope)));
 
 	return 0;
 }
@@ -573,7 +583,9 @@ static int dps_reg_id_set(struct azure_iot_hub_buf reg_id)
 
 	dps_reg_ctx.reg_id = az_span_create(id, id_len);
 
-	LOG_INF("Setting DPS registration ID: %.*s", SPAN_LOG(dps_reg_ctx.reg_id));
+	LOG_DBG("Setting DPS registration ID: %.*s",
+		az_span_size(dps_reg_ctx.reg_id),
+		log_strdup(az_span_ptr(dps_reg_ctx.reg_id)));
 
 	return 0;
 }
@@ -641,7 +653,7 @@ static int dps_send_reg_request(void)
 	return mqtt_helper_publish(&param);
 }
 
-STATIC int provisioning_client_init(struct mqtt_helper_conn_params *conn_params)
+AZ_DPS_STATIC int provisioning_client_init(struct mqtt_helper_conn_params *conn_params)
 {
 	int err;
 	az_span dps_hostname = AZ_SPAN_LITERAL_FROM_STR(CONFIG_AZURE_IOT_HUB_DPS_HOSTNAME);
@@ -695,7 +707,7 @@ STATIC int provisioning_client_init(struct mqtt_helper_conn_params *conn_params)
 	return 0;
 }
 
-STATIC void on_publish(struct azure_iot_hub_buf topic, struct azure_iot_hub_buf payload)
+AZ_DPS_STATIC void on_publish(struct azure_iot_hub_buf topic, struct azure_iot_hub_buf payload)
 {
 	az_span topic_span = az_span_create(topic.ptr, topic.size);
 	az_span payload_span = az_span_create(payload.ptr, payload.size);
@@ -869,10 +881,13 @@ int azure_iot_hub_dps_start(void)
 
 	if ((az_span_size(dps_reg_ctx.assigned_hub) > 0) &&
 	    (az_span_size(dps_reg_ctx.assigned_device_id) > 0)) {
-		LOG_INF("Device \"%.*s\" is assigned to IoT hub: %.*s",
-			SPAN_LOG(dps_reg_ctx.assigned_device_id),
-			SPAN_LOG(dps_reg_ctx.assigned_hub));
-		LOG_INF("To re-register, call azure_iot_hub_dps_reset() first");
+		LOG_DBG("Device \"%.*s\" is assigned to IoT hub: %.*s",
+			az_span_size(dps_reg_ctx.assigned_device_id),
+			log_strdup(az_span_ptr(dps_reg_ctx.assigned_device_id)),
+			az_span_size(dps_reg_ctx.assigned_hub),
+			log_strdup(az_span_ptr(dps_reg_ctx.assigned_hub)));
+
+		LOG_DBG("To re-register, call azure_iot_hub_dps_reset() first");
 
 		dps_reg_ctx.status = AZURE_IOT_HUB_DPS_REG_STATUS_ASSIGNED;
 

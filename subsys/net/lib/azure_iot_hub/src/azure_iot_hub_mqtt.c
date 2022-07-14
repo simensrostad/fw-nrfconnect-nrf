@@ -19,21 +19,21 @@
 
 LOG_MODULE_REGISTER(azure_iot_hub_mqtt, CONFIG_AZURE_IOT_HUB_LOG_LEVEL);
 
-/* Define a custom STATIC macro that exposes internal variables when unit testing. */
+/* Define a custom AZ_MQTT_STATIC macro that exposes internal variables when unit testing. */
 #if defined(CONFIG_UNITY)
-#define STATIC
+#define AZ_MQTT_STATIC
 #else
-#define STATIC static
+#define AZ_MQTT_STATIC static
 #endif
 
-STATIC struct mqtt_client mqtt_client;
+AZ_MQTT_STATIC struct mqtt_client mqtt_client;
 static struct sockaddr_storage broker;
 static char rx_buffer[CONFIG_AZURE_IOT_HUB_MQTT_RX_TX_BUFFER_LEN];
 static char tx_buffer[CONFIG_AZURE_IOT_HUB_MQTT_RX_TX_BUFFER_LEN];
-STATIC char payload_buf[CONFIG_AZURE_IOT_HUB_MQTT_PAYLOAD_BUFFER_LEN];
-STATIC K_SEM_DEFINE(connection_poll_sem, 0, 1);
+AZ_MQTT_STATIC char payload_buf[CONFIG_AZURE_IOT_HUB_MQTT_PAYLOAD_BUFFER_LEN];
+AZ_MQTT_STATIC K_SEM_DEFINE(connection_poll_sem, 0, 1);
 static struct mqtt_helper_cfg current_cfg;
-STATIC enum mqtt_state mqtt_state = MQTT_STATE_UNINIT;
+AZ_MQTT_STATIC enum mqtt_state mqtt_state = MQTT_STATE_UNINIT;
 
 static const char *state_name_get(enum mqtt_state state)
 {
@@ -48,12 +48,12 @@ static const char *state_name_get(enum mqtt_state state)
 	}
 }
 
-STATIC enum mqtt_state mqtt_state_get(void)
+AZ_MQTT_STATIC enum mqtt_state mqtt_state_get(void)
 {
 	return mqtt_state;
 }
 
-STATIC void mqtt_state_set(enum mqtt_state new_state)
+AZ_MQTT_STATIC void mqtt_state_set(enum mqtt_state new_state)
 {
 	bool notify_error = false;
 
@@ -196,7 +196,7 @@ static void send_ack(struct mqtt_client *const mqtt_client, uint16_t message_id)
 	LOG_DBG("PUBACK sent for message ID %d", message_id);
 }
 
-STATIC void on_publish(const struct mqtt_evt *mqtt_evt)
+AZ_MQTT_STATIC void on_publish(const struct mqtt_evt *mqtt_evt)
 {
 	int err;
 	const struct mqtt_publish_param *p = &mqtt_evt->param.publish;
@@ -230,7 +230,7 @@ STATIC void on_publish(const struct mqtt_evt *mqtt_evt)
 	}
 }
 
-STATIC void mqtt_evt_handler(struct mqtt_client *const mqtt_client,
+AZ_MQTT_STATIC void mqtt_evt_handler(struct mqtt_client *const mqtt_client,
 			     const struct mqtt_evt *mqtt_evt)
 {
 	switch (mqtt_evt->type) {
@@ -584,7 +584,7 @@ int mqtt_helper_deinit(void)
 	return 0;
 }
 
-STATIC void mqtt_helper_poll_loop(void)
+AZ_MQTT_STATIC void mqtt_helper_poll_loop(void)
 {
 	int ret;
 	struct pollfd fds[1];
@@ -636,7 +636,8 @@ STATIC void mqtt_helper_poll_loop(void)
 			 * this point we know that the socket has
 			 * been closed and we can break out of poll.
 			 */
-			if (mqtt_state_verify(MQTT_STATE_DISCONNECTED)) {
+			if (mqtt_state_verify(MQTT_STATE_DISCONNECTED) ||
+			    mqtt_state_verify(MQTT_STATE_UNINIT)) {
 				LOG_DBG("The socket is already closed");
 				break;
 			}

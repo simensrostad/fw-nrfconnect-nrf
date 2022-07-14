@@ -35,73 +35,104 @@ LOG_MODULE_REGISTER(MODULE, CONFIG_CLOUD_INTEGRATION_LOG_LEVEL);
 
 static struct azure_iot_hub_property prop_bag_message[] = {
 	{
-		.key = PROP_BAG_CONTENT_TYPE_KEY,
-		.value = PROP_BAG_CONTENT_TYPE_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_TYPE_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_TYPE_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_TYPE_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_TYPE_VALUE) - 1,
 	},
 	{
-		.key = PROP_BAG_CONTENT_ENCODING_KEY,
-		.value = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_ENCODING_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_ENCODING_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_ENCODING_VALUE) - 1,
 	},
 };
 static struct azure_iot_hub_property prop_bag_batch[] = {
 	{
-		.key = PROP_BAG_BATCH_KEY,
-		.value = NULL,
+		.key.ptr = PROP_BAG_BATCH_KEY,
+		.key.size = sizeof(PROP_BAG_BATCH_KEY) - 1,
+		.value.ptr = NULL,
 	},
 	{
-		.key = PROP_BAG_CONTENT_TYPE_KEY,
-		.value = PROP_BAG_CONTENT_TYPE_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_TYPE_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_TYPE_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_TYPE_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_TYPE_VALUE) - 1,
 	},
 	{
-		.key = PROP_BAG_CONTENT_ENCODING_KEY,
-		.value = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_ENCODING_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_ENCODING_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_ENCODING_VALUE) - 1,
 	},
 };
 static struct azure_iot_hub_property prop_bag_agps[] = {
 	{
-		.key = PROP_BAG_AGPS_KEY,
-		.value = PROP_BAG_AGPS_GET_VALUE,
+		.key.ptr = PROP_BAG_AGPS_KEY,
+		.key.size = sizeof(PROP_BAG_AGPS_KEY) - 1,
+		.value.ptr = PROP_BAG_AGPS_GET_VALUE,
+		.value.size = sizeof(PROP_BAG_AGPS_GET_VALUE) - 1,
 	},
 	{
-		.key = PROP_BAG_CONTENT_TYPE_KEY,
-		.value = PROP_BAG_CONTENT_TYPE_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_TYPE_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_TYPE_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_TYPE_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_TYPE_VALUE) - 1,
 	},
 	{
-		.key = PROP_BAG_CONTENT_ENCODING_KEY,
-		.value = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_ENCODING_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_ENCODING_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_ENCODING_VALUE) - 1,
 	},
 };
 static struct azure_iot_hub_property prop_bag_pgps[] = {
 	{
-		.key = PROP_BAG_PGPS_KEY,
-		.value = PROP_BAG_PGPS_GET_VALUE,
+		.key.ptr = PROP_BAG_PGPS_KEY,
+		.key.size = sizeof(PROP_BAG_PGPS_KEY) - 1,
+		.value.ptr = PROP_BAG_PGPS_GET_VALUE,
+		.value.size = sizeof(PROP_BAG_PGPS_GET_VALUE) - 1,
 	},
 	{
-		.key = PROP_BAG_CONTENT_TYPE_KEY,
-		.value = PROP_BAG_CONTENT_TYPE_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_TYPE_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_TYPE_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_TYPE_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_TYPE_VALUE) - 1,
 	},
 	{
-		.key = PROP_BAG_CONTENT_ENCODING_KEY,
-		.value = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_ENCODING_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_ENCODING_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_ENCODING_VALUE) - 1,
 	},
 };
 static struct azure_iot_hub_property prop_bag_ncellmeas[] = {
 	{
-		.key = PROP_BAG_NEIGHBOR_CELLS_KEY,
-		.value = NULL,
+		.key.ptr = PROP_BAG_NEIGHBOR_CELLS_KEY,
+		.key.size = sizeof(PROP_BAG_NEIGHBOR_CELLS_KEY) - 1,
+		.value.ptr = NULL,
 	},
 	{
-		.key = PROP_BAG_CONTENT_TYPE_KEY,
-		.value = PROP_BAG_CONTENT_TYPE_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_TYPE_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_TYPE_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_TYPE_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_TYPE_VALUE) - 1,
 	},
 	{
-		.key = PROP_BAG_CONTENT_ENCODING_KEY,
-		.value = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.key.ptr = PROP_BAG_CONTENT_ENCODING_KEY,
+		.key.size = sizeof(PROP_BAG_CONTENT_ENCODING_KEY) - 1,
+		.value.ptr = PROP_BAG_CONTENT_ENCODING_VALUE,
+		.value.size = sizeof(PROP_BAG_CONTENT_ENCODING_VALUE) - 1,
 	},
 };
 
 static char client_id_buf[CLIENT_ID_LEN + 1];
-static struct azure_iot_hub_config config;
+static struct azure_iot_hub_config config = {
+	.use_dps = IS_ENABLED(CONFIG_AZURE_IOT_HUB_DPS),
+	.device_id.ptr = client_id_buf,
+	.device_id.size = sizeof(client_id_buf) - 1,
+};
+
 static cloud_wrap_evt_handler_t wrapper_evt_handler;
 
 static void cloud_wrapper_notify_event(const struct cloud_wrap_event *evt)
@@ -123,8 +154,8 @@ static void cloud_wrapper_notify_event(const struct cloud_wrap_event *evt)
 static void incoming_message_handle(struct azure_iot_hub_evt *event)
 {
 	struct cloud_wrap_event cloud_wrap_evt = {
-		.data.buf = event->data.msg.ptr,
-		.data.len = event->data.msg.len,
+		.data.buf = event->data.msg.payload.ptr,
+		.data.len = event->data.msg.payload.size,
 		.type = CLOUD_WRAP_EVT_DATA_RECEIVED
 	};
 
@@ -141,19 +172,19 @@ static void incoming_message_handle(struct azure_iot_hub_evt *event)
 	 * on A-GPS and P-GPS related key and value pairs.
 	 */
 	for (int i = 0; i < event->topic.property_count; i++) {
-		if ((event->topic.properties[i].key == NULL) ||
-		    (event->topic.properties[i].key == NULL)) {
+		if ((event->topic.properties[i].key.ptr == NULL) ||
+		    (event->topic.properties[i].key.ptr == NULL)) {
 			LOG_DBG("Key or value is NULL");
 			continue;
 		}
 
 		/* Property bags are null terminated strings. */
-		if (!strcmp(event->topic.properties[i].key, PROP_BAG_AGPS_KEY) &&
-		    !strcmp(event->topic.properties[i].value, PROP_BAG_AGPS_RESPONSE_VALUE)) {
+		if (!strcmp(event->topic.properties[i].key.ptr, PROP_BAG_AGPS_KEY) &&
+		    !strcmp(event->topic.properties[i].value.ptr, PROP_BAG_AGPS_RESPONSE_VALUE)) {
 			cloud_wrap_evt.type = CLOUD_WRAP_EVT_AGPS_DATA_RECEIVED;
-		} else if (!strcmp(event->topic.properties[i].key, PROP_BAG_PGPS_KEY) &&
-			   !strcmp(event->topic.properties[i].value,
-				PROP_BAG_PGPS_RESPONSE_VALUE)) {
+		} else if (!strcmp(event->topic.properties[i].key.ptr, PROP_BAG_PGPS_KEY) &&
+			   !strcmp(event->topic.properties[i].value.ptr,
+				   PROP_BAG_PGPS_RESPONSE_VALUE)) {
 			cloud_wrap_evt.type = CLOUD_WRAP_EVT_PGPS_DATA_RECEIVED;
 		}
 	}
@@ -196,15 +227,15 @@ static void azure_iot_hub_event_handler(struct azure_iot_hub_evt *const evt)
 	case AZURE_IOT_HUB_EVT_TWIN_RECEIVED:
 		LOG_DBG("AZURE_IOT_HUB_EVT_TWIN_RECEIVED");
 		cloud_wrap_evt.type = CLOUD_WRAP_EVT_DATA_RECEIVED;
-		cloud_wrap_evt.data.buf = evt->data.msg.ptr;
-		cloud_wrap_evt.data.len = evt->data.msg.len;
+		cloud_wrap_evt.data.buf = evt->data.msg.payload.ptr;
+		cloud_wrap_evt.data.len = evt->data.msg.payload.size;
 		notify = true;
 		break;
 	case AZURE_IOT_HUB_EVT_TWIN_DESIRED_RECEIVED:
 		LOG_DBG("AZURE_IOT_HUB_EVT_TWIN_DESIRED_RECEIVED");
 		cloud_wrap_evt.type = CLOUD_WRAP_EVT_DATA_RECEIVED;
-		cloud_wrap_evt.data.buf = evt->data.msg.ptr;
-		cloud_wrap_evt.data.len = evt->data.msg.len;
+		cloud_wrap_evt.data.buf = evt->data.msg.payload.ptr;
+		cloud_wrap_evt.data.len = evt->data.msg.payload.size;
 		notify = true;
 		break;
 	case AZURE_IOT_HUB_EVT_DIRECT_METHOD:
@@ -291,11 +322,7 @@ int cloud_wrap_init(cloud_wrap_evt_handler_t event_handler)
 	snprintk(client_id_buf, sizeof(client_id_buf), "%s", CONFIG_CLOUD_CLIENT_ID);
 #endif
 
-	/* Fetch IMEI from modem data and set IMEI as cloud connection ID */
-	config.device_id = client_id_buf;
-	config.device_id_len = strlen(client_id_buf);
-
-	err = azure_iot_hub_init(&config, azure_iot_hub_event_handler);
+	err = azure_iot_hub_init(azure_iot_hub_event_handler);
 	if (err) {
 		LOG_ERR("azure_iot_hub_init, error: %d", err);
 		return err;
@@ -321,7 +348,7 @@ int cloud_wrap_connect(void)
 {
 	int err;
 
-	err = azure_iot_hub_connect();
+	err = azure_iot_hub_connect(&config);
 	if (err) {
 		LOG_ERR("azure_iot_hub_connect, error: %d", err);
 		return err;
@@ -347,8 +374,8 @@ int cloud_wrap_state_get(bool ack, uint32_t id)
 {
 	int err;
 	struct azure_iot_hub_msg msg = {
-		.ptr = REQUEST_DEVICE_TWIN_STRING,
-		.len = sizeof(REQUEST_DEVICE_TWIN_STRING) - 1,
+		.payload.ptr = REQUEST_DEVICE_TWIN_STRING,
+		.payload.size = sizeof(REQUEST_DEVICE_TWIN_STRING) - 1,
 		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AZURE_IOT_HUB_TOPIC_TWIN_REPORTED
 	};
@@ -366,8 +393,8 @@ int cloud_wrap_state_send(char *buf, size_t len, bool ack, uint32_t id)
 {
 	int err;
 	struct azure_iot_hub_msg msg = {
-		.ptr = buf,
-		.len = len,
+		.payload.ptr = buf,
+		.payload.size = len,
 		.message_id = id,
 		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AZURE_IOT_HUB_TOPIC_TWIN_REPORTED,
@@ -388,8 +415,8 @@ int cloud_wrap_data_send(char *buf, size_t len, bool ack, uint32_t id, char *pat
 
 	int err;
 	struct azure_iot_hub_msg msg = {
-		.ptr = buf,
-		.len = len,
+		.payload.ptr = buf,
+		.payload.size = len,
 		.message_id = id,
 		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AZURE_IOT_HUB_TOPIC_TWIN_REPORTED,
@@ -408,8 +435,8 @@ int cloud_wrap_batch_send(char *buf, size_t len, bool ack, uint32_t id)
 {
 	int err;
 	struct azure_iot_hub_msg msg = {
-		.ptr = buf,
-		.len = len,
+		.payload.ptr = buf,
+		.payload.size = len,
 		.message_id = id,
 		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AZURE_IOT_HUB_TOPIC_EVENT,
@@ -432,8 +459,8 @@ int cloud_wrap_ui_send(char *buf, size_t len, bool ack, uint32_t id, char *path_
 
 	int err;
 	struct azure_iot_hub_msg msg = {
-		.ptr = buf,
-		.len = len,
+		.payload.ptr = buf,
+		.payload.size = len,
 		.message_id = id,
 		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AZURE_IOT_HUB_TOPIC_EVENT,
@@ -456,8 +483,8 @@ int cloud_wrap_neighbor_cells_send(char *buf, size_t len, bool ack, uint32_t id,
 
 	int err;
 	struct azure_iot_hub_msg msg = {
-		.ptr = buf,
-		.len = len,
+		.payload.ptr = buf,
+		.payload.size = len,
 		.message_id = id,
 		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AZURE_IOT_HUB_TOPIC_EVENT,
@@ -480,8 +507,8 @@ int cloud_wrap_agps_request_send(char *buf, size_t len, bool ack, uint32_t id, c
 
 	int err;
 	struct azure_iot_hub_msg msg = {
-		.ptr = buf,
-		.len = len,
+		.payload.ptr = buf,
+		.payload.size = len,
 		.message_id = id,
 		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AZURE_IOT_HUB_TOPIC_EVENT,
@@ -502,8 +529,8 @@ int cloud_wrap_pgps_request_send(char *buf, size_t len, bool ack, uint32_t id)
 {
 	int err;
 	struct azure_iot_hub_msg msg = {
-		.ptr = buf,
-		.len = len,
+		.payload.ptr = buf,
+		.payload.size = len,
 		.message_id = id,
 		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
 		.topic.type = AZURE_IOT_HUB_TOPIC_EVENT,
