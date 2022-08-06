@@ -1331,8 +1331,16 @@ int nct_dc_disconnect(void)
 
 	LOG_DBG("nct_dc_disconnect");
 
+	struct mqtt_topic subscribe_topic = {
+		.topic = {
+			.utf8 = nct.dc_rx_endp.utf8,
+			.size = nct.dc_rx_endp.size
+		},
+		.qos = MQTT_QOS_1_AT_LEAST_ONCE
+	};
+
 	const struct mqtt_subscription_list subscription_list = {
-		.list = (struct mqtt_topic *)&nct.dc_rx_endp,
+		.list = &subscribe_topic,
 		.list_count = 1,
 		.message_id = NCT_MSG_ID_DC_UNSUB
 	};

@@ -108,12 +108,20 @@ This section provides detailed lists of changes by :ref:`application <applicatio
 nRF9160: Asset Tracker v2
 -------------------------
 
-|no_changes_yet_note|
+  * Updated:
+
+    * Added handling for the new data receive events in the :ref:`lib_nrf_cloud` library.
+
+  * Removed:
+
+    * A-GPS and P-GPS processing; it is now handled by the :ref:`lib_nrf_cloud` library.
 
 nRF9160: Serial LTE modem
 -------------------------
 
-|no_changes_yet_note|
+  * Updated:
+
+    * Added handling for the new data receive events in the :ref:`lib_nrf_cloud` library.
 
 nRF5340 Audio
 -------------
@@ -164,6 +172,27 @@ nRF9160 samples
   * Added:
 
     * Ability to use buttons to generate location assistance requests.
+
+* :ref:`lte_sensor_gateway` sample:
+
+  * Updated:
+
+    * Added handling for the new data receive events in the :ref:`lib_nrf_cloud` library.
+    * Removed A-GPS and P-GPS processing; it is now handled by the :ref:`lib_nrf_cloud` library.
+
+* :ref:`modem_shell_application` sample:
+
+  * Updated:
+
+    * Added handling for the new data receive events in the :ref:`lib_nrf_cloud` library.
+    * Removed A-GPS and P-GPS processing; it is now handled by the :ref:`lib_nrf_cloud` library.
+
+* :ref:`nrf_cloud_mqtt_multi_service` sample:
+
+  * Changed:
+
+    * Added handling for the new data receive events in the :ref:`lib_nrf_cloud` library.
+    * Removed A-GPS and P-GPS processing; it is now handled by the :ref:`lib_nrf_cloud` library.
 
 Thread samples
 --------------
@@ -240,7 +269,13 @@ Modem libraries
 Libraries for networking
 ------------------------
 
-|no_changes_yet_note|
+  * :ref:`lib_nrf_cloud` library:
+
+    * Updated:
+
+      * The library now subscribes to a wildcard cloud-to-device (c2d) topic. This enables the device to receive location services data on separate topics.
+      * Replaced event :c:enum:`NRF_CLOUD_EVT_RX_DATA` with :c:enum:`NRF_CLOUD_EVT_RX_DATA_GENERAL`. Added events :c:enum:`NRF_CLOUD_EVT_RX_DATA_CELL_POS` and :c:enum:`NRF_CLOUD_EVT_RX_DATA_SHADOW`.
+      * The library now processes A-GPS and P-GPS data; it is no longer passed to the application.
 
   * :ref:`modem_info_readme` library:
 
