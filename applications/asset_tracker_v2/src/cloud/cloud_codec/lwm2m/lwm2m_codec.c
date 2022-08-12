@@ -252,54 +252,41 @@ static int config_update_cb(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 	return 0;
 }
 
+#define CREATE_RES_INSTANCE(arg) 			\
+err = lwm2m_engine_create_res_inst(arg);		\
+if (err) {						\
+	return err;					\
+}
+
+#define LWM2M_CODEC_RESOURCE_INSTANCES_CREATE(...)		\
+	FOR_EACH(CREATE_RES_INSTANCE, (;), __VA_ARGS__)
+
+#define CREATE_OBJ_INSTANCE(arg) 		\
+err = lwm2m_engine_create_obj_inst(arg);	\
+if (err) {					\
+	return err;				\
+}
+
+#define LWM2M_CODEC_OBJECT_INSTANCES_CREATE(...)		\
+	FOR_EACH(CREATE_OBJ_INSTANCE, (;), __VA_ARGS__)
+
 int cloud_codec_init(struct cloud_data_cfg *cfg, cloud_codec_evt_handler_t event_handler)
 {
 	int err;
 
-	err = lwm2m_engine_create_res_inst(LWM2M_PATH(LWM2M_OBJECT_CONNECTIVITY_MONITORING_ID, 0,
-						      AVAIL_NETWORK_BEARER_ID, 0));
-	if (err) {
-		return err;
-	}
+	LWM2M_CODEC_OBJECT_INSTANCES_CREATE(
+		LWM2M_PATH(IPSO_OBJECT_PRESSURE_ID, 0),
+		LWM2M_PATH(IPSO_OBJECT_TEMP_SENSOR_ID, 0),
+		LWM2M_PATH(IPSO_OBJECT_HUMIDITY_SENSOR_ID, 0),
+		LWM2M_PATH(IPSO_OBJECT_PUSH_BUTTON_ID, BUTTON1_OBJ_INST_ID))
 
-	err = lwm2m_engine_create_res_inst(LWM2M_PATH(LWM2M_OBJECT_CONNECTIVITY_MONITORING_ID, 0,
-						      AVAIL_NETWORK_BEARER_ID, 1));
-	if (err) {
-		return err;
-	}
+	LWM2M_CODEC_RESOURCE_INSTANCES_CREATE(
+		LWM2M_PATH(LWM2M_OBJECT_CONNECTIVITY_MONITORING_ID, 0, AVAIL_NETWORK_BEARER_ID, 0),
+		LWM2M_PATH(LWM2M_OBJECT_CONNECTIVITY_MONITORING_ID, 0, AVAIL_NETWORK_BEARER_ID, 1),
+		LWM2M_PATH(LWM2M_OBJECT_CONNECTIVITY_MONITORING_ID, 0, IP_ADDRESSES, 0),
+		LWM2M_PATH(LWM2M_OBJECT_CONNECTIVITY_MONITORING_ID, 0, APN, 0),
+		LWM2M_PATH(LWM2M_OBJECT_DEVICE_ID, 0, POWER_SOURCE_VOLTAGE_RID, 0))
 
-	err = lwm2m_engine_create_res_inst(LWM2M_PATH(LWM2M_OBJECT_CONNECTIVITY_MONITORING_ID, 0,
-						      IP_ADDRESSES, 0));
-	if (err) {
-		return err;
-	}
-
-	err = lwm2m_engine_create_res_inst(LWM2M_PATH(LWM2M_OBJECT_CONNECTIVITY_MONITORING_ID, 0,
-						      APN, 0));
-	if (err) {
-		return err;
-	}
-
-	err = lwm2m_engine_create_obj_inst(LWM2M_PATH(IPSO_OBJECT_PRESSURE_ID, 0));
-	if (err) {
-		return err;
-	}
-
-	err = lwm2m_engine_create_obj_inst(LWM2M_PATH(IPSO_OBJECT_TEMP_SENSOR_ID, 0));
-	if (err) {
-		return err;
-	}
-
-	err = lwm2m_engine_create_obj_inst(LWM2M_PATH(IPSO_OBJECT_HUMIDITY_SENSOR_ID, 0));
-	if (err) {
-		return err;
-	}
-
-	err = lwm2m_engine_create_res_inst(LWM2M_PATH(LWM2M_OBJECT_DEVICE_ID, 0,
-						      POWER_SOURCE_VOLTAGE_RID, 0));
-	if (err) {
-		return err;
-	}
 
 	/* Device current time. */
 	err = lwm2m_engine_set_res_buf(LWM2M_PATH(LWM2M_OBJECT_DEVICE_ID, 0,
@@ -517,14 +504,6 @@ int cloud_codec_init(struct cloud_data_cfg *cfg, cloud_codec_evt_handler_t event
 		return err;
 	}
 
-
-	/* Create Button 1 object instance. */
-	err = lwm2m_engine_create_obj_inst(LWM2M_PATH(IPSO_OBJECT_PUSH_BUTTON_ID,
-						      BUTTON1_OBJ_INST_ID));
-	if (err) {
-		return err;
-	}
-
 	err = lwm2m_engine_set_res_buf(
 		LWM2M_PATH(IPSO_OBJECT_PUSH_BUTTON_ID, BUTTON1_OBJ_INST_ID, APPLICATION_TYPE_RID),
 		BUTTON1_APP_NAME, sizeof(BUTTON1_APP_NAME), sizeof(BUTTON1_APP_NAME),
@@ -543,11 +522,7 @@ int cloud_codec_init(struct cloud_data_cfg *cfg, cloud_codec_evt_handler_t event
 
 	/* Create Button 2 object instance. */
 	if (CONFIG_LWM2M_IPSO_PUSH_BUTTON_INSTANCE_COUNT == 2) {
-		err = lwm2m_engine_create_obj_inst(LWM2M_PATH(IPSO_OBJECT_PUSH_BUTTON_ID,
-						   BUTTON2_OBJ_INST_ID));
-		if (err) {
-			return err;
-		}
+		LWM2M_CODEC_OBJECT_INSTANCES_CREATE(LWM2M_PATH(IPSO_OBJECT_PUSH_BUTTON_ID, BUTTON2_OBJ_INST_ID))
 
 		err = lwm2m_engine_set_res_buf(LWM2M_PATH(IPSO_OBJECT_PUSH_BUTTON_ID,
 							  BUTTON2_OBJ_INST_ID,
