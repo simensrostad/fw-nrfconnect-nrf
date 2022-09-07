@@ -235,6 +235,24 @@ typedef void (*lwm2m_lte_nwk_reg_update_state_cb_t)(bool connected);
 int lwm2m_lte_reg_handler_register(lwm2m_lte_nwk_reg_update_state_cb_t cb);
 #endif
 
+#if defined(CONFIG_LWM2M_CLIENT_UTILS_GROUND_FIX_OBJ_SUPPORT)
+#define GROUND_FIX_OBJECT_ID 33626
+/**
+ * @brief Set if the server should report the location back to the object
+ *        after it has attained it.
+ *
+ * @param report_back Boolean value showing if the server should report the location back.
+ */
+void ground_fix_set_report_back(bool report_back);
+
+/**
+ * @brief Get the result code of the location request.
+ *
+ * @return int32_t Returns a result code from the LwM2M server.
+ */
+int32_t ground_fix_get_result_code(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
