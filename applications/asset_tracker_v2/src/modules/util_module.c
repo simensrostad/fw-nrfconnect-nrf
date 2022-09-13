@@ -187,8 +187,7 @@ static void send_reboot_request(enum shutdown_reason reason)
 	static bool error_signaled;
 
 	if (!error_signaled) {
-		struct util_module_event *util_module_event =
-				new_util_module_event();
+		struct util_module_event *util_module_event = new_util_module_event();
 
 		util_module_event->type = UTIL_EVT_SHUTDOWN_REQUEST;
 		util_module_event->reason = reason;

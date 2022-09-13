@@ -686,6 +686,10 @@ static int setup(void)
 	int err;
 
 	err = cloud_wrap_init(cloud_wrap_event_handler);
+	if (err < 0) {
+		LOG_DBG("Modem firmware reboot requested");
+	}
+
 	if (err) {
 		LOG_ERR("cloud_wrap_init, error: %d", err);
 		return err;

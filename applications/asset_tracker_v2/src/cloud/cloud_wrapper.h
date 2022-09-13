@@ -110,6 +110,7 @@ typedef void (*cloud_wrap_evt_handler_t)(const struct cloud_wrap_event *evt);
  * @brief Setup and initialize the configured cloud integration layer.
  *
  * @return 0 on success, or a negative error code on failure.
+ * @retval 1 if a reboot has been requested pending a modem firmware FOTA update.
  */
 int cloud_wrap_init(cloud_wrap_evt_handler_t event_handler);
 

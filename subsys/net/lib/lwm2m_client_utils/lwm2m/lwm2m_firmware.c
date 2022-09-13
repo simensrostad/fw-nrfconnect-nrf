@@ -18,6 +18,7 @@
 #include <net/fota_download.h>
 #include <net/lwm2m_client_utils.h>
 #include <net/lwm2m_client_utils_fota.h>
+#include <lwm2m_util.h>
 /* Firmware update needs access to internal functions as well */
 #include <lwm2m_engine.h>
 
@@ -32,6 +33,8 @@
 LOG_MODULE_REGISTER(lwm2m_firmware, CONFIG_LWM2M_CLIENT_UTILS_LOG_LEVEL);
 
 #define BYTE_PROGRESS_STEP (1024 * 10)
+#define LWM2M_OBJECT_DEVICE_ID 3
+#define DEVICE_OBJECT_REBOOT_RID 4
 
 static lwm2m_firmware_get_update_state_cb_t update_state_cb;
 static uint8_t firmware_buf[CONFIG_LWM2M_COAP_BLOCK_SIZE];
@@ -59,8 +62,20 @@ void client_acknowledge(void);
 
 static int request_reboot(void)
 {
+	LOG_WRN("Requesting reboot!");
+
 	int ret;
-	struct lwm2m_engine_res *res = lwm2m_engine_get_res("3/0/4");
+	struct lwm2m_obj_path path;
+
+	/* Convert path string to path structure. */
+	ret = lwm2m_string_to_path("3/0/4", &path, '/');
+	if (ret) {
+		LOG_ERR("lwm2m_string_to_path, error: %d", ret);
+		return ret;
+	}
+
+	/* Locate device reboot resource. */
+	struct lwm2m_engine_res *res = lwm2m_engine_get_res(&path);
 
 	if (!res && !res->execute_cb) {
 		LOG_ERR("No execute callback registered");
@@ -68,7 +83,7 @@ static int request_reboot(void)
 	}
 
 	/* Request reboot by triggering device reboot resource. */
-	ret = res->execute_cb(0, NULL, 0);
+	ret = res->execute_cb(path.obj_inst_id, NULL, 0);
 	if (ret) {
 		LOG_ERR("Execute callback, error: %d", ret);
 		return -ENOEXEC;
@@ -550,6 +565,9 @@ int lwm2m_verify_modem_fw_update(void)
 	/* Handle return values relating to modem firmware update */
 	int ret = modem_lib_init_result;
 	switch (ret) {
+	case 0:
+		/* Initialization successful. */
+		return 0;
 	case MODEM_DFU_RESULT_OK:
 		LOG_INF("MODEM UPDATE OK. Will run new firmware");
 
@@ -579,9 +597,9 @@ int lwm2m_verify_modem_fw_update(void)
 	case MODEM_DFU_RESULT_INTERNAL_ERROR:
 		LOG_ERR("MODEM UPDATE FATAL ERROR %d. Modem failiure", ret);
 		break;
-
 	default:
-		return;
+		LOG_ERR("Unknown nrf modem lib initialization result: %d", ret);
+		return -EINVAL;
 	}
 
 	return request_reboot();

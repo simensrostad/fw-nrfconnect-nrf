@@ -6,6 +6,7 @@
 
 #include <zephyr.h>
 #include <net/lwm2m.h>
+#include <lwm2m_engine.h>
 #include <net/lwm2m_client_utils.h>
 #include <lwm2m_resource_ids.h>
 #include <lwm2m_rd_client.h>
@@ -198,8 +199,6 @@ static int device_reboot_cb(uint16_t obj_inst_id, uint8_t *args, uint16_t args_l
 	ARG_UNUSED(args_len);
 	ARG_UNUSED(obj_inst_id);
 
-	int err;
-	uint8_t firmware_update_state = 0;
 	struct cloud_wrap_event cloud_wrap_evt = {
 		.type = CLOUD_WRAP_EVT_REBOOT_REQUEST
 	};
@@ -207,13 +206,8 @@ static int device_reboot_cb(uint16_t obj_inst_id, uint8_t *args, uint16_t args_l
 	/* Get current state of the FOTA update to determine if the reboot request was triggered
 	 * due to FOTA being completed.
 	 */
-	err = lwm2m_engine_get_u8("5/0/4", &firmware_update_state);
-	if (err) {
-		LOG_ERR("Failed getting firmware update state, error: %d", err);
-	}
-
-	if (firmware_update_state == STATE_UPDATING) {
-		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_DONE
+	if (lwm2m_firmware_get_update_state() == STATE_UPDATING) {
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_DONE;
 	}
 
 	cloud_wrapper_notify_event(&cloud_wrap_evt);
@@ -316,6 +310,33 @@ int cloud_wrap_init(cloud_wrap_evt_handler_t event_handler)
 		.user_data = NULL
 	};
 
+	wrapper_evt_handler = event_handler;
+	state = DISCONNECTED;
+
+	err = lwm2m_init_image();
+	if (err < 0) {
+		LOG_ERR("lwm2m_init_image, error: %d", err);
+		return err;
+	}
+
+	/* Register callback for reboot requests. */
+	err = lwm2m_engine_register_exec_callback(LWM2M_PATH(LWM2M_OBJECT_DEVICE_ID, 0,
+							     DEVICE_OBJECT_REBOOT_RID),
+						  device_reboot_cb);
+	if (err) {
+		LOG_ERR("lwm2m_engine_register_exec_callback, error: %d", err);
+		return err;
+	}
+
+	err = lwm2m_verify_modem_fw_update();
+	if (err < 0) {
+		LOG_WRN("Reboot requested");
+		return 1;
+	} else if (err) {
+		LOG_ERR("lwm2m_verify_modem_fw_update, error: %d", err);
+		return err;
+	}
+
 #if !defined(CONFIG_CLOUD_CLIENT_ID_USE_CUSTOM)
 	char imei_buf[20 + sizeof("OK\r\n")];
 
@@ -407,31 +428,7 @@ int cloud_wrap_init(cloud_wrap_evt_handler_t event_handler)
 	}
 #endif /* CONFIG_LWM2M_INTEGRATION_PROVISION_CREDENTIALS */
 
-	err = lwm2m_init_image();
-	if (err < 0) {
-		LOG_ERR("lwm2m_init_image, error: %d", err);
-		return err;
-	}
-
-	/* Register callback for reboot requests. */
-	err = lwm2m_engine_register_exec_callback(LWM2M_PATH(LWM2M_OBJECT_DEVICE_ID, 0,
-							     DEVICE_OBJECT_REBOOT_RID),
-						  device_reboot_cb);
-	if (err) {
-		LOG_ERR("lwm2m_engine_register_exec_callback, error: %d", err);
-		return err;
-	}
-
-	err = lwm2m_verify_modem_fw_update();
-	if (err) {
-		LOG_ERR("lwm2m_verify_modem_fw_update, error: %d", err);
-		return err;
-	}
-
 	lwm2m_firmware_set_update_state_cb(firmware_update_state_cb);
-
-	wrapper_evt_handler = event_handler;
-	state = DISCONNECTED;
 	return 0;
 }
 

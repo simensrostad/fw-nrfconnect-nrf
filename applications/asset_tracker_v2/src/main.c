@@ -9,11 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <app_event_manager.h>
-#if defined(CONFIG_NRF_MODEM_LIB)
-#include <modem/nrf_modem_lib.h>
-#endif /* CONFIG_NRF_MODEM_LIB */
 #include <zephyr/sys/reboot.h>
-#include <net/lwm2m_client_utils_fota.h>
 #include <net/nrf_cloud.h>
 
 #if defined(CONFIG_NRF_CLOUD_AGPS) || defined(CONFIG_NRF_CLOUD_PGPS)
@@ -133,18 +129,6 @@ static struct module_data self = {
 	.supports_shutdown = true,
 };
 
-#if defined(CONFIG_NRF_MODEM_LIB)
-NRF_MODEM_LIB_ON_INIT(asset_tracker_init_hook, on_modem_lib_init, NULL);
-
-/* Initialized to value different than success (0) */
-static int modem_lib_init_result = -1;
-
-static void on_modem_lib_init(int ret, void *ctx)
-{
-	modem_lib_init_result = ret;
-}
-#endif /* CONFIG_NRF_MODEM_LIB */
-
 /* Convenience functions used in internal state handling. */
 static char *state2str(enum state_type new_state)
 {
@@ -198,81 +182,6 @@ static void sub_state_set(enum sub_state_type new_state)
 		sub_state2str(new_state));
 
 	sub_state = new_state;
-}
-
-#if defined(CONFIG_LWM2M_INTEGRATION)
-static void lwm2m_update_modem_fota_counter(void)
-{
-	int ret;
-	struct update_counter counter = { 0 };
-
-	ret = fota_settings_init();
-	if (ret) {
-		LOG_WRN("Unable to init settings, error: %d", ret);
-		return;
-	}
-
-	ret = fota_update_counter_read(&counter);
-	if (ret) {
-		LOG_ERR("Failed read the update counter, error: %d", ret);
-		return;
-	}
-
-	if (counter.update != -1) {
-		ret = fota_update_counter_update(COUNTER_CURRENT, counter.update);
-		if (ret) {
-			LOG_ERR("Failed to update the update counter, error: %d", ret);
-			return;
-		}
-	}
-}
-#endif /* CONFIG_LWM2M_INTEGRATION */
-
-/* Check the return code from nRF modem library initialization to ensure that
- * the modem is rebooted if a modem firmware update is ready to be applied or
- * an error condition occurred during firmware update or library initialization.
- */
-static void handle_nrf_modem_lib_init_ret(void)
-{
-#if defined(CONFIG_NRF_MODEM_LIB)
-	int ret = modem_lib_init_result;
-
-	/* Handle return values relating to modem firmware update */
-	switch (ret) {
-	case 0:
-		/* Initialization successful, no action required. */
-		return;
-	case MODEM_DFU_RESULT_OK:
-		LOG_WRN("MODEM UPDATE OK. Will run new modem firmware after reboot");
-#if defined(CONFIG_LWM2M_INTEGRATION)
-		lwm2m_update_modem_fota_counter();
-#endif
-		break;
-	case MODEM_DFU_RESULT_UUID_ERROR:
-	case MODEM_DFU_RESULT_AUTH_ERROR:
-		LOG_ERR("MODEM UPDATE ERROR %d. Will run old firmware", ret);
-		break;
-	case MODEM_DFU_RESULT_HARDWARE_ERROR:
-	case MODEM_DFU_RESULT_INTERNAL_ERROR:
-		LOG_ERR("MODEM UPDATE FATAL ERROR %d. Modem failure", ret);
-		break;
-	default:
-		/* All non-zero return codes other than DFU result codes are
-		 * considered irrecoverable and a reboot is needed.
-		 */
-		LOG_ERR("nRF modem lib initialization failed, error: %d", ret);
-		break;
-	}
-
-#if defined(CONFIG_NRF_CLOUD_FOTA)
-	/* Ignore return value, rebooting below */
-	(void)nrf_cloud_fota_pending_job_validate(NULL);
-#endif
-
-	LOG_WRN("Rebooting...");
-	LOG_PANIC();
-	sys_reboot(SYS_REBOOT_COLD);
-#endif /* CONFIG_NRF_MODEM_LIB */
 }
 
 /* Application Event Manager handler. Puts event data into messages and adds them to the
@@ -619,10 +528,6 @@ void main(void)
 {
 	int err;
 	struct app_msg_data msg = { 0 };
-
-	if (!IS_ENABLED(CONFIG_LWM2M_CARRIER)) {
-		handle_nrf_modem_lib_init_ret();
-	}
 
 	if (app_event_manager_init()) {
 		/* Without the Application Event Manager, the application will not work
