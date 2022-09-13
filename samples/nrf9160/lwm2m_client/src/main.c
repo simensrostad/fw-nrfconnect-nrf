@@ -405,7 +405,11 @@ void main(void)
 		LOG_WRN("Unable to init settings (%d)", ret);
 	}
 	/* Modem FW update needs to be verified before modem is used. */
-	lwm2m_verify_modem_fw_update();
+	ret = lwm2m_verify_modem_fw_update();
+	if (ret < 0) {
+		LOG_ERR("Unable to verify modem firmware update");
+		return;
+	}
 #endif
 
 #if defined(CONFIG_PDN)

@@ -198,9 +198,23 @@ static int device_reboot_cb(uint16_t obj_inst_id, uint8_t *args, uint16_t args_l
 	ARG_UNUSED(args_len);
 	ARG_UNUSED(obj_inst_id);
 
+	int err;
+	uint8_t firmware_update_state = 0;
 	struct cloud_wrap_event cloud_wrap_evt = {
 		.type = CLOUD_WRAP_EVT_REBOOT_REQUEST
 	};
+
+	/* Get current state of the FOTA update to determine if the reboot request was triggered
+	 * due to FOTA being completed.
+	 */
+	err = lwm2m_engine_get_u8("5/0/4", &firmware_update_state);
+	if (err) {
+		LOG_ERR("Failed getting firmware update state, error: %d", err);
+	}
+
+	if (firmware_update_state == STATE_UPDATING) {
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_DONE
+	}
 
 	cloud_wrapper_notify_event(&cloud_wrap_evt);
 	return 0;
@@ -249,6 +263,49 @@ static int modem_mode_request_cb(enum lte_lc_func_mode new_mode, void *user_data
 	 * Set by CONFIG_LWM2M_INTEGRATION_MODEM_MODE_REQUEST_RETRY_SECONDS.
 	 */
 	return CONFIG_LWM2M_INTEGRATION_MODEM_MODE_REQUEST_RETRY_SECONDS;
+}
+
+static int firmware_update_state_cb(uint8_t update_state)
+{
+	int err;
+	uint8_t update_result;
+	struct cloud_wrap_event cloud_wrap_evt = { 0 };
+
+	/* Get the firmware object update result code */
+	err = lwm2m_engine_get_u8("5/0/5", &update_result);
+	if (err) {
+		LOG_ERR("Failed getting firmware result resource value");
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_ERROR;
+		cloud_wrap_evt.err = err;
+		cloud_wrapper_notify_event(&cloud_wrap_evt);
+		return 0;
+	}
+
+	switch (update_state) {
+	case STATE_IDLE:
+		LOG_DBG("STATE_IDLE, result: %d", update_result);
+
+		/* If the FOTA state returns to its base state STATE_IDLE, the FOTA failed. */
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_ERROR;
+		break;
+	case STATE_DOWNLOADING:
+		LOG_DBG("STATE_DOWNLOADING, result: %d", update_result);
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_START;
+		break;
+	case STATE_DOWNLOADED:
+		LOG_DBG("STATE_DOWNLOADED, result: %d", update_result);
+		return 0;
+	case STATE_UPDATING:
+		LOG_DBG("STATE_UPDATING, result: %d", update_result);
+		return 0;
+	default:
+		LOG_ERR("Unknown state: %d", update_state);
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_ERROR;
+		break;
+	}
+
+	cloud_wrapper_notify_event(&cloud_wrap_evt);
+	return 0;
 }
 
 int cloud_wrap_init(cloud_wrap_evt_handler_t event_handler)
@@ -364,6 +421,14 @@ int cloud_wrap_init(cloud_wrap_evt_handler_t event_handler)
 		LOG_ERR("lwm2m_engine_register_exec_callback, error: %d", err);
 		return err;
 	}
+
+	err = lwm2m_verify_modem_fw_update();
+	if (err) {
+		LOG_ERR("lwm2m_verify_modem_fw_update, error: %d", err);
+		return err;
+	}
+
+	lwm2m_firmware_set_update_state_cb(firmware_update_state_cb);
 
 	wrapper_evt_handler = event_handler;
 	state = DISCONNECTED;
