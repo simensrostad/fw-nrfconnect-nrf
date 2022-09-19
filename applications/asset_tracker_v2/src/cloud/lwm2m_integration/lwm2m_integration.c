@@ -157,12 +157,25 @@ static void rd_client_event(struct lwm2m_ctx *client, enum lwm2m_rd_client_event
 		break;
 	case LWM2M_RD_CLIENT_EVENT_REG_UPDATE_FAILURE:
 		LOG_WRN("LWM2M_RD_CLIENT_EVENT_REG_UPDATE_FAILURE");
-		cloud_wrap_evt.type = CLOUD_WRAP_EVT_DISCONNECTED;
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_CONNECTING;
 		notify = true;
-		state = DISCONNECTED;
+		state = CONNECTING;
 		break;
 	case LWM2M_RD_CLIENT_EVENT_REG_UPDATE_COMPLETE:
 		LOG_DBG("LWM2M_RD_CLIENT_EVENT_REG_UPDATE_COMPLETE");
+
+		/* If a registration update fails, which is identified by receiving the event
+		 * LWM2M_RD_CLIENT_EVENT_REG_UPDATE_FAILURE, the engine will try to recover the
+		 * connection by itself. Once the engine has successfully carried out
+		 * a registration update, LWM2M_RD_CLIENT_EVENT_REG_UPDATE_COMPLETE is received,
+		 * and the connection is again considered valid.
+		 */
+		if (state == CONNECTING) {
+			cloud_wrap_evt.type = CLOUD_WRAP_EVT_CONNECTED;
+			notify = true;
+			state = CONNECTED;
+		}
+
 		break;
 	case LWM2M_RD_CLIENT_EVENT_DEREGISTER_FAILURE:
 		LOG_WRN("LWM2M_RD_CLIENT_EVENT_DEREGISTER_FAILURE");
