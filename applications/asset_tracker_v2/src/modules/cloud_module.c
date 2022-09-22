@@ -270,49 +270,6 @@ static bool app_event_handler(const struct app_event_header *aeh)
 	return consume;
 }
 
-static void agps_data_handle(const uint8_t *buf, size_t len)
-{
-	int err;
-
-#if defined(CONFIG_NRF_CLOUD_AGPS)
-	err = nrf_cloud_agps_process(buf, len);
-	if (err) {
-		if (err == -EFAULT) {
-			/* An A-GPS error code from nRF Cloud was received */
-			return;
-		}
-		LOG_WRN("Unable to process A-GPS data, error: %d", err);
-	} else {
-		LOG_DBG("A-GPS data processed");
-	}
-#endif
-
-#if defined(CONFIG_NRF_CLOUD_PGPS)
-#if defined(CONFIG_NRF_CLOUD_AGPS)
-	if (!err) {
-		err = nrf_cloud_pgps_notify_prediction();
-		if (err) {
-			LOG_ERR("Error requesting prediction notification: %d", err);
-		} else {
-			return;
-		}
-	}
-#endif
-
-	LOG_DBG("Process incoming data if P-GPS related");
-
-	err = nrf_cloud_pgps_process(buf, len);
-	if (err) {
-		if (err == -EFAULT) {
-			/* A P-GPS error code from nRF Cloud was received */
-			return;
-		}
-		LOG_ERR("Unable to process P-GPS data, error: %d", err);
-	}
-#endif
-
-	(void)err;
-}
 
 static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 {
@@ -341,8 +298,7 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 		 * before it is sent to the Data module. This way we avoid
 		 * sending uninitialized variables to the Data module.
 		 */
-		err = cloud_codec_decode_config(evt->data.buf, evt->data.len,
-						&copy_cfg);
+		err = cloud_codec_decode_config(evt->data.buf, evt->data.len, &copy_cfg);
 		if (err == 0) {
 			LOG_DBG("Device configuration encoded");
 			send_config_received();
@@ -365,7 +321,35 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 		break;
 	case CLOUD_WRAP_EVT_PGPS_DATA_RECEIVED:
 		LOG_DBG("CLOUD_WRAP_EVT_PGPS_DATA_RECEIVED");
-		agps_data_handle(evt->data.buf, evt->data.len);
+
+#if defined(CONFIG_NRF_CLOUD_PGPS)
+		err = nrf_cloud_pgps_process(evt->data.buf, evt->data.len);
+		if (err) {
+			LOG_ERR("Unable to process P-GPS data, error: %d", err);
+			return;
+		}
+#endif /* CONFIG_NRF_CLOUD_PGPS */
+
+		break;
+	case CLOUD_WRAP_EVT_AGPS_DATA_RECEIVED:
+		LOG_DBG("CLOUD_WRAP_EVT_AGPS_DATA_RECEIVED");
+
+#if defined(CONFIG_NRF_CLOUD_AGPS)
+		err = nrf_cloud_agps_process(evt->data.buf, evt->data.len);
+		if (err) {
+			LOG_ERR("Unable to process A-GPS data, error: %d", err);
+			return;
+		}
+
+#if defined(CONFIG_NRF_CLOUD_PGPS)
+		err = nrf_cloud_pgps_notify_prediction();
+		if (err) {
+			LOG_ERR("Error requesting prediction notification: %d", err);
+			return;
+		}
+#endif /* CONFIG_NRF_CLOUD_PGPS */
+#endif /* CONFIG_NRF_CLOUD_AGPS */
+
 		break;
 	case CLOUD_WRAP_EVT_USER_ASSOCIATION_REQUEST: {
 		LOG_DBG("CLOUD_WRAP_EVT_USER_ASSOCIATION_REQUEST");
@@ -410,10 +394,6 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 		SEND_EVENT(cloud, CLOUD_EVT_FOTA_DONE);
 		break;
 	}
-	case CLOUD_WRAP_EVT_AGPS_DATA_RECEIVED:
-		LOG_DBG("CLOUD_WRAP_EVT_AGPS_DATA_RECEIVED");
-		agps_data_handle(evt->data.buf, evt->data.len);
-		break;
 	case CLOUD_WRAP_EVT_FOTA_START: {
 		LOG_DBG("CLOUD_WRAP_EVT_FOTA_START");
 		SEND_EVENT(cloud, CLOUD_EVT_FOTA_START);
