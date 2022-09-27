@@ -52,7 +52,7 @@ manifest:
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/guides/modules.html
     - name: zephyr
       repo-path: sdk-zephyr
-      revision: d4b8ac4db1ed463928126383281b1989d200653b
+      revision: pull/916/head
       import:
         # In addition to the zephyr repository itself, NCS also
         # imports the contents of zephyr/west.yml at the above
@@ -75,7 +75,7 @@ manifest:
           - fff
           - hal_nordic
           - hal_st # required for ST sensors (unrealted to STM32 MCUs)
-          - liblc3codec
+          - liblc3
           - libmetal
           - littlefs
           - loramac-node
@@ -93,6 +93,7 @@ manifest:
           - tinycbor
           - tinycrypt
           - tf-m-tests
+          - uoscore-uedhoc
           - zcbor
           - zscilib
 
@@ -105,7 +106,7 @@ manifest:
       revision: 306b36c1f02579c1988c3dbab64baac4ec7b9224
     - name: mcuboot
       repo-path: sdk-mcuboot
-      revision: v1.9.99-ncs2
+      revision: pull/215/head
       path: bootloader/mcuboot
     - name: mbedtls-nrf
       path: mbedtls
@@ -114,11 +115,11 @@ manifest:
     - name: nrfxlib
       repo-path: sdk-nrfxlib
       path: nrfxlib
-      revision: 303b506ec891ae6505ff1467eb868cd71ef37405
+      revision: pull/838/head
     - name: trusted-firmware-m
       repo-path: sdk-trusted-firmware-m
       path: modules/tee/tf-m/trusted-firmware-m
-      revision: 11b5f0a978afff3893143a09b4f771938a3bba5e
+      revision: pull/68/head
     - name: tfm-mcuboot # This is used by the trusted-firmware-m module.
       repo-path: sdk-mcuboot
       path: modules/tee/tfm-mcuboot
@@ -126,7 +127,7 @@ manifest:
     - name: matter
       repo-path: sdk-connectedhomeip
       path: modules/lib/matter
-      revision: v2.1.0
+      revision: pull/125/head
       submodules:
         - name: nlio
           path: third_party/nlio/repo
@@ -148,7 +149,7 @@ manifest:
       revision: c6af068b7f05207b28d68880740e4b9ec1e4b50a
     - name: homekit
       repo-path: sdk-homekit
-      revision: ad45f481cb94825b491acde3ae059852ce4729d3
+      revision: pull/445/head
       groups:
         - homekit
     - name: find-my
