@@ -90,6 +90,7 @@ config DATA_UI_BUFFER_STORE
 
 choice DATA_DEVICE_MODE
 	prompt "Device mode"
+	default DATA_DEVICE_MODE_PASSIVE if BOARD_THINGY91_NRF9160_NS
 	default DATA_DEVICE_MODE_ACTIVE
 	help
 	  The device can be in either active or passive mode.
@@ -115,14 +116,14 @@ config DATA_ACTIVE_TIMEOUT_SECONDS
 
 config DATA_MOVEMENT_RESOLUTION_SECONDS
 	int "Default movement resolution in seconds"
-	default 120
+	default 300
 	help
 	  Number of seconds between each time movement can trigger sampling/publication in passive
 	  mode.
 
 config DATA_MOVEMENT_TIMEOUT_SECONDS
 	int "Default movement timeout in seconds"
-	default 3600
+	default 43200
 	help
 	  Number of seconds between each sampling/publication in passive mode regardless of
 	  movement. Used as a fail-safe to ensure updates even if the device is not moving for
@@ -130,7 +131,7 @@ config DATA_MOVEMENT_TIMEOUT_SECONDS
 
 config DATA_ACCELEROMETER_ACT_THRESHOLD
 	int "Default accelerometer activity threshold in m/s²"
-	default 10
+	default 5
 	help
 	  Minimum absolute value in m/s² that is considered movement in passive mode.
 
@@ -142,7 +143,7 @@ config DATA_ACCELEROMETER_INACT_THRESHOLD
 
 config DATA_ACCELEROMETER_INACT_TIMEOUT_SECONDS
 	int "Default accelerometer inactivity timeout in seconds"
-	default 60
+	default 120
 	help
 	  Minimum time for lack of movement to be considered stillness in passive mode.
 

@@ -58,17 +58,17 @@ The real-time configurations supported by the application are listed in the foll
 +----------+-------------------------+--------------------------------------------------------------------------------------------------------------------------------------+----------------+
 |  Passive |                         | Cloud updates occur upon movement.                                                                                                   |                |
 |          +-------------------------+--------------------------------------------------------------------------------------------------------------------------------------+----------------+
-|          | Movement resolution     | Number of seconds between each cloud update in passive mode, given that the device is moving.                                        | 120 seconds    |
+|          | Movement resolution     | Number of seconds between each cloud update in passive mode, given that the device is moving.                                        | 300 seconds    |
 |          +-------------------------+--------------------------------------------------------------------------------------------------------------------------------------+----------------+
-|          | Movement timeout        | Number of seconds between each cloud update in passive mode, regardless of movement.                                                 | 3600 seconds   |
+|          | Movement timeout        | Number of seconds between each cloud update in passive mode, regardless of movement.                                                 | 43200 seconds  |
 +----------+-------------------------+--------------------------------------------------------------------------------------------------------------------------------------+----------------+
 | GNSS timeout                       | Timeout for acquiring a GNSS fix during data sampling.                                                                               | 30 seconds     |
 +------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+----------------+
-| Accelerometer activity threshold   | Accelerometer activity threshold in m/s². Minimal absolute value for accelerometer readings to be considered valid movement.         | 10 m/s²        |
+| Accelerometer activity threshold   | Accelerometer activity threshold in m/s². Minimal absolute value for accelerometer readings to be considered valid movement.         | 5 m/s²         |
 +------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+----------------+
 | Accelerometer inactivity threshold | Accelerometer inactivity threshold in m/s². Maximal absolute value for accelerometer readings to be considered stillness.            | 5 m/s²         |
 +------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+----------------+
-| Accelerometer inactivity timeout   | Accelerometer inactivity timeout in seconds. Minimum time for lack of movement to be considered stillness.                           | 1 second       |
+| Accelerometer inactivity timeout   | Accelerometer inactivity timeout in seconds. Minimum time for lack of movement to be considered stillness.                           | 120 seconds    |
 +------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+----------------+
 | No Data List (NOD)                 | A list of strings that references :ref:`data types <app_data_types>`, which will not be sampled by the application.                  | No entries     |
 |                                    | Used to disable sampling from sensor sources.                                                                                        | (Request all)  |
