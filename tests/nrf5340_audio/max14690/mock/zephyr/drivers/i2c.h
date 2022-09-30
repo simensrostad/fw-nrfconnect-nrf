@@ -1,4 +1,4 @@
-#include <ztest.h>
+#include <zephyr/ztest.h>
 #include <zephyr/device.h>
 
 int i2c_reg_read_byte(const struct device *dev, uint16_t dev_addr, uint8_t reg_addr, uint8_t *value)
