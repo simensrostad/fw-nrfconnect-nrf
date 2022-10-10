@@ -116,6 +116,8 @@ static aws_iot_evt_handler_t module_evt_handler;
 static atomic_t disconnect_requested;
 static atomic_t connection_poll_active;
 
+static int sec_tag = CONFIG_AWS_IOT_SEC_TAG;
+
 /* Flag that indicates if the client is disconnected from the
  * AWS IoT broker, or not.
  */
@@ -839,7 +841,11 @@ static int client_broker_init(struct mqtt_client *const client)
 	client->will_message = &last_will_message;
 #endif
 
-	static sec_tag_t sec_tag_list[] = { CONFIG_AWS_IOT_SEC_TAG };
+	static sec_tag_t sec_tag_list[1];
+	sec_tag_list[0] = sec_tag;
+
+	LOG_DBG("Using security tag: %d", sec_tag);
+
 	struct mqtt_sec_config *tls_cfg = &(client->transport).tls.config;
 
 	tls_cfg->peer_verify		= 2;
@@ -848,7 +854,8 @@ static int client_broker_init(struct mqtt_client *const client)
 	tls_cfg->sec_tag_count		= ARRAY_SIZE(sec_tag_list);
 	tls_cfg->sec_tag_list		= sec_tag_list;
 	tls_cfg->hostname		= CONFIG_AWS_IOT_BROKER_HOST_NAME;
-	tls_cfg->session_cache = TLS_SESSION_CACHE_DISABLED;
+	tls_cfg->session_cache		= TLS_SESSION_CACHE_DISABLED;
+	tls_cfg->set_native_tls		= IS_ENABLED(CONFIG_MBEDTLS_TLS_LIBRARY);
 
 #if defined(CONFIG_AWS_IOT_PROVISION_CERTIFICATES)
 	err = certificates_provision();
@@ -856,6 +863,9 @@ static int client_broker_init(struct mqtt_client *const client)
 		LOG_ERR("Could not provision certificates, error: %d", err);
 		return err;
 	}
+
+	LOG_DBG("Credentials provisioned to security tag %d", CONFIG_AWS_IOT_SEC_TAG);
+
 #endif /* CONFIG_AWS_IOT_PROVISION_CERTIFICATES */
 
 	return err;
@@ -1010,6 +1020,13 @@ int aws_iot_connect(struct aws_iot_config *const config)
 {
 	int err;
 
+	/* If the passed in config structure is not null, we override the sec tag used for the
+	 * connection.
+	 */
+	if (config != NULL) {
+		sec_tag = config->sec_tag;
+	}
+
 	if (IS_ENABLED(CONFIG_AWS_IOT_CONNECTION_POLL_THREAD)) {
 		err = connection_poll_start();
 		if (err) {
@@ -1049,11 +1066,18 @@ int aws_iot_subscription_topics_add(
 		app_topic_data.list[i].topic.utf8 = topic_list[i].str;
 		app_topic_data.list[i].topic.size = topic_list[i].len;
 		app_topic_data.list[i].qos = MQTT_QOS_1_AT_LEAST_ONCE;
+
+		LOG_WRN("Subscribed to custom topic: %s", topic_list[i].str);
 	}
 
 	app_topic_data.list_count = list_count;
 
 	return 0;
+}
+
+void aws_iot_subscription_topics_clear(void)
+{
+	memset(&app_topic_data, 0, sizeof(struct aws_iot_app_topic_data));
 }
 
 int aws_iot_init(const struct aws_iot_config *const config,

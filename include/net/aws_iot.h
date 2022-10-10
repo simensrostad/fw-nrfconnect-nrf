@@ -187,6 +187,12 @@ struct aws_iot_config {
 	char *client_id;
 	/** Length of client_id string. */
 	size_t client_id_len;
+
+	/** Security tag. If the configuration object is not NULL when passed in
+	 *  aws_iot_connect(), the security tag present in the configuration structure will be used
+	 *  for the connection to AWS IoT.
+	 */
+	int sec_tag;
 };
 
 /** @brief Initialize the module.
@@ -262,6 +268,9 @@ int aws_iot_ping(void);
 int aws_iot_subscription_topics_add(
 			const struct aws_iot_topic_data *const topic_list,
 			size_t list_count);
+
+/** @brief Clear application specific topics. */
+void aws_iot_subscription_topics_clear(void);
 
 #ifdef __cplusplus
 }
