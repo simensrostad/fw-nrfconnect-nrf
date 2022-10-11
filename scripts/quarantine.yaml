@@ -12,3 +12,13 @@
   platforms:
     - all
   comment: "CONFIG_TFM_ISOLATION_LEVEL=2 currently doesn't work, see NCSDK-15463."
+
+- scenarios:
+    - sample.ant_advanced_burst
+    - sample.ant_broadcast_rx
+    - sample.ant_broadcast_tx
+    - sample.ant_rpc
+    - sample.hrm_tx
+  platforms:
+    - all
+  comment: "Zephyr include paths need to updated in the sdk-ant repository."
