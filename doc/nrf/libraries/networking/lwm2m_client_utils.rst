@@ -55,7 +55,7 @@ If you are using the Firmware Update object and require downloading of firmware 
 
 Location Assistance object (:kconfig:option:`CONFIG_LWM2M_CLIENT_UTILS_LOCATION_ASSIST_OBJ_SUPPORT`) is a proprietary LwM2M object used to deliver information required by various location services through LwM2M.
 It is still under development and considered :ref:`experimental <software_maturity>`.
-See the :ref:`location_assistance` section in the LwM2M client sample documentation for more information.
+See the :ref:`lib_location_assistance` library documentation for more information.
 
 Defining custom objects
 =======================
