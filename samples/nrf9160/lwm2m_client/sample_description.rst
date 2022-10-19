@@ -11,7 +11,7 @@ The LwM2M Client demonstrates usage of the :term:`Lightweight Machine to Machine
 This sample uses the :ref:`lib_lwm2m_client_utils` library.
 
 The sample also supports a proprietary mechanism to fetch location assistance data from `nRF Cloud`_ by proxying it through the LwM2M server.
-For this, the sample makes use of the :ref:`lib_location_assistance` library.
+For this, the sample makes use of the :ref:`lib_lwm2m_location_assistance` library.
 
 Requirements
 ************
@@ -669,7 +669,7 @@ Dependencies
 This sample application uses the following |NCS| libraries and drivers:
 
 * :ref:`lib_lwm2m_client_utils`
-* :ref:`lib_location_assistance`
+* :ref:`lib_lwm2m_location_assistance`
 * :ref:`modem_info_readme`
 * :ref:`at_cmd_parser_readme`
 * :ref:`dk_buttons_and_leds_readme`
