@@ -5,22 +5,12 @@
  */
 
 #include <zephyr/kernel.h>
+#include <zephyr/smf.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <app_event_manager.h>
-#if defined(CONFIG_NRF_MODEM_LIB)
-#include <modem/nrf_modem_lib.h>
-#endif /* CONFIG_NRF_MODEM_LIB */
 #include <zephyr/sys/reboot.h>
-#if defined(CONFIG_LWM2M_INTEGRATION)
-#include <net/lwm2m_client_utils.h>
-#endif /* CONFIG_LWM2M_INTEGRATION */
-#include <net/nrf_cloud.h>
-
-#if defined(CONFIG_NRF_CLOUD_AGPS) || defined(CONFIG_NRF_CLOUD_PGPS)
-#include <net/nrf_cloud_agps.h>
-#endif
 
 /* Module name is used by the Application Event Manager macros in this file */
 #define MODULE main
@@ -56,73 +46,23 @@ struct app_msg_data {
 	} module;
 };
 
-/* Application module super states. */
-static enum state_type {
-	STATE_INIT,
-	STATE_RUNNING,
-	STATE_SHUTDOWN
-} state;
-
-/* Application sub states. The application can be in either active or passive
- * mode.
- *
- * Active mode: Sensor data and GNSS position is acquired at a configured
- *		interval and sent to cloud.
- *
- * Passive mode: Sensor data and GNSS position is acquired when movement is
- *		 detected, or after the configured movement timeout occurs.
- */
-static enum sub_state_type {
-	SUB_STATE_ACTIVE_MODE,
-	SUB_STATE_PASSIVE_MODE,
-} sub_state;
-
 /* Internal copy of the device configuration. */
 static struct cloud_data_cfg app_cfg;
 
-/* Variable that keeps track whether modem static data has been successfully sampled by the
- * modem module. Modem static data does not change and only needs to be sampled and sent to cloud
- * once.
- */
-static bool modem_static_sampled;
+/* Application module message queue. */
+#define QUEUE_ENTRY_COUNT	10
+#define QUEUE_BYTE_ALIGNMENT	4
 
-/* Variable that keeps track of if a sample request is ongoing. */
-static bool sample_request_ongoing;
-
-/* Variable that is set high whenever a sample request is ongoing. */
-static bool activity;
+K_MSGQ_DEFINE(msgq_app, sizeof(struct app_msg_data), QUEUE_ENTRY_COUNT, QUEUE_BYTE_ALIGNMENT);
 
 /* Timer callback used to signal when timeout has occurred both in active
  * and passive mode.
  */
 static void data_sample_timer_handler(struct k_timer *timer);
+static void data_get(void);
 
-/* Application module message queue. */
-#define APP_QUEUE_ENTRY_COUNT		10
-#define APP_QUEUE_BYTE_ALIGNMENT	4
-
-/* Data fetching timeouts */
-#define DATA_FETCH_TIMEOUT_DEFAULT 2
-/* Use a timeout of 11 seconds to accommodate for neighbour cell measurements
- * that can take up to 10.24 seconds.
- */
-#define DATA_FETCH_TIMEOUT_NEIGHBORHOOD_SEARCH 11
-
-K_MSGQ_DEFINE(msgq_app, sizeof(struct app_msg_data), APP_QUEUE_ENTRY_COUNT,
-	      APP_QUEUE_BYTE_ALIGNMENT);
-
-/* Data sample timer used in active mode. */
 K_TIMER_DEFINE(data_sample_timer, data_sample_timer_handler, NULL);
-
-/* Movement timer used to detect movement timeouts in passive mode. */
 K_TIMER_DEFINE(movement_timeout_timer, data_sample_timer_handler, NULL);
-
-/* Movement resolution timer decides the period after movement that consecutive
- * movements are ignored and do not cause data collection. This is used to
- * lower power consumption by limiting how often GNSS search is performed and
- * data is sent on air.
- */
-K_TIMER_DEFINE(movement_resolution_timer, NULL, NULL);
 
 /* Module data structure to hold information of the application module, which
  * opens up for using convenience functions available for modules.
@@ -133,116 +73,147 @@ static struct module_data self = {
 	.supports_shutdown = true,
 };
 
-#if defined(CONFIG_NRF_MODEM_LIB)
-NRF_MODEM_LIB_ON_INIT(asset_tracker_init_hook, on_modem_lib_init, NULL);
+/* Forward declaration of state table */
+static const struct smf_state state[];
 
-/* Initialized to value different than success (0) */
-static int modem_lib_init_result = -1;
+/* States */
+enum demo_state { INIT, RUNNING, ACTIVE, PASSIVE, ACTIVITY, INACTIVITY};
 
-static void on_modem_lib_init(int ret, void *ctx)
+/* User defined state object */
+static struct s_object {
+	/* This must be first */
+	struct smf_ctx ctx;
+
+	/* Application message data. */
+	struct app_msg_data *msg;
+
+} s_obj;
+
+/* INIT State functions */
+static void init_run(void *o)
 {
-	modem_lib_init_result = ret;
-}
-#endif /* CONFIG_NRF_MODEM_LIB */
+	struct s_object *od = o;
 
-/* Convenience functions used in internal state handling. */
-static char *state2str(enum state_type new_state)
-{
-	switch (new_state) {
-	case STATE_INIT:
-		return "STATE_INIT";
-	case STATE_RUNNING:
-		return "STATE_RUNNING";
-	case STATE_SHUTDOWN:
-		return "STATE_SHUTDOWN";
-	default:
-		return "Unknown";
-	}
-}
+	if (IS_EVENT(od->msg, data, DATA_EVT_CONFIG_INIT)) {
+		/* Keep a copy of the new configuration. */
+		app_cfg = od->msg->module.data.data.cfg;
 
-static char *sub_state2str(enum sub_state_type new_state)
-{
-	switch (new_state) {
-	case SUB_STATE_ACTIVE_MODE:
-		return "SUB_STATE_ACTIVE_MODE";
-	case SUB_STATE_PASSIVE_MODE:
-		return "SUB_STATE_PASSIVE_MODE";
-	default:
-		return "Unknown";
-	}
-}
-
-static void state_set(enum state_type new_state)
-{
-	if (new_state == state) {
-		LOG_DBG("State: %s", state2str(state));
-		return;
-	}
-
-	LOG_DBG("State transition %s --> %s",
-		state2str(state),
-		state2str(new_state));
-
-	state = new_state;
-}
-
-static void sub_state_set(enum sub_state_type new_state)
-{
-	if (new_state == sub_state) {
-		LOG_DBG("Sub state: %s", sub_state2str(sub_state));
-		return;
-	}
-
-	LOG_DBG("Sub state transition %s --> %s",
-		sub_state2str(sub_state),
-		sub_state2str(new_state));
-
-	sub_state = new_state;
-}
-
-/* Check the return code from nRF modem library initialization to ensure that
- * the modem is rebooted if a modem firmware update is ready to be applied or
- * an error condition occurred during firmware update or library initialization.
- */
-static void handle_nrf_modem_lib_init_ret(void)
-{
-#if defined(CONFIG_NRF_MODEM_LIB)
-	int ret = modem_lib_init_result;
-
-	/* Handle return values relating to modem firmware update */
-	switch (ret) {
-	case 0:
-		/* Initialization successful, no action required. */
-		return;
-	case MODEM_DFU_RESULT_OK:
-		LOG_WRN("MODEM UPDATE OK. Will run new modem firmware after reboot");
-		break;
-	case MODEM_DFU_RESULT_UUID_ERROR:
-	case MODEM_DFU_RESULT_AUTH_ERROR:
-		LOG_ERR("MODEM UPDATE ERROR %d. Will run old firmware", ret);
-		break;
-	case MODEM_DFU_RESULT_HARDWARE_ERROR:
-	case MODEM_DFU_RESULT_INTERNAL_ERROR:
-		LOG_ERR("MODEM UPDATE FATAL ERROR %d. Modem failure", ret);
-		break;
-	default:
-		/* All non-zero return codes other than DFU result codes are
-		 * considered irrecoverable and a reboot is needed.
+		/* If app is in passive mode, go directly to inactivity, this implicitly changes
+		 * the super-state to passive.
+		 *
+		 * Reset sensor module here to ensure that it is in an inactive state.
+		 * or assume that the device is in an inactive state and sampling will be trigger
+		 * upon the next activity event.
 		 */
-		LOG_ERR("nRF modem lib initialization failed, error: %d", ret);
-		break;
+		smf_set_state(SMF_CTX(&s_obj), app_cfg.active_mode ? &state[ACTIVE] :
+								     &state[INACTIVITY]);
 	}
+}
 
-#if defined(CONFIG_NRF_CLOUD_FOTA)
-	/* Ignore return value, rebooting below */
-	(void)nrf_cloud_fota_pending_job_validate(NULL);
-#elif defined(CONFIG_LWM2M_INTEGRATION)
-	lwm2m_verify_modem_fw_update();
-#endif
-	LOG_WRN("Rebooting...");
-	LOG_PANIC();
-	sys_reboot(SYS_REBOOT_COLD);
-#endif /* CONFIG_NRF_MODEM_LIB */
+/* RUNNING State */
+static void running_run(void *o)
+{
+	struct s_object *od = o;
+
+	if ((IS_EVENT(od->msg, sensor, SENSOR_EVT_MOVEMENT_IMPACT_DETECTED)) ||
+	    (IS_EVENT(od->msg, cloud, CLOUD_EVT_CONNECTED))) {
+		data_get();
+	}
+}
+
+/* ACTIVE State */
+static void active_entry(void *o)
+{
+	k_timer_start(&data_sample_timer,
+		      K_SECONDS(app_cfg.active_wait_timeout),
+		      K_SECONDS(app_cfg.active_wait_timeout));
+}
+
+static void active_run(void *o)
+{
+	struct s_object *od = o;
+
+	if (IS_EVENT(od->msg, data, DATA_EVT_CONFIG_READY)) {
+		/* Keep a copy of the new configuration. */
+		app_cfg = od->msg->module.data.data.cfg;
+
+		if (app_cfg.active_mode) {
+			return;
+		}
+
+		/* Reset sensor module here to ensure that it is in an inactive state.
+		 * or assume that the device is in an inactive state and sampling will be trigger
+		 * upon the next activity event.
+		 */
+		smf_set_state(SMF_CTX(&s_obj), &state[INACTIVITY]);
+	}
+}
+
+/* PASSIVE State */
+static void passive_entry(void *o)
+{
+	k_timer_start(&movement_timeout_timer,
+		      K_SECONDS(app_cfg.movement_timeout),
+		      K_SECONDS(app_cfg.movement_timeout));
+}
+
+static void passive_run(void *o)
+{
+	struct s_object *od = o;
+
+	if (IS_EVENT(od->msg, data, DATA_EVT_CONFIG_READY)) {
+		/* Keep a copy of the new configuration. */
+		app_cfg = od->msg->module.data.data.cfg;
+
+		if (app_cfg.active_mode == false) {
+			return;
+		}
+
+		smf_set_state(SMF_CTX(&s_obj), &state[ACTIVE]);
+	}
+}
+
+static void passive_exit(void *o)
+{
+	k_timer_stop(&movement_timeout_timer);
+}
+
+/* ACTIVITY State */
+static void activity_entry(void *o)
+{
+	k_timer_start(&data_sample_timer,
+		      K_NO_WAIT,
+		      K_SECONDS(app_cfg.movement_resolution));
+}
+
+static void activity_run(void *o)
+{
+	struct s_object *od = o;
+
+	if (IS_EVENT(od->msg, sensor, SENSOR_EVT_MOVEMENT_INACTIVITY_DETECTED)) {
+		smf_set_state(SMF_CTX(&s_obj), &state[INACTIVITY]);
+	}
+}
+
+static void activity_exit(void *o)
+{
+	/* When exiting activity we want to do an additional sample request. */
+	data_get();
+}
+
+/* INACTIVITY State */
+static void inactivity_entry(void *o)
+{
+	k_timer_stop(&data_sample_timer);
+}
+
+static void inactivity_run(void *o)
+{
+	struct s_object *od = o;
+
+	if (IS_EVENT(od->msg, sensor, SENSOR_EVT_MOVEMENT_ACTIVITY_DETECTED)) {
+		smf_set_state(SMF_CTX(&s_obj), &state[ACTIVITY]);
+	}
 }
 
 /* Application Event Manager handler. Puts event data into messages and adds them to the
@@ -307,126 +278,10 @@ static bool app_event_handler(const struct app_event_header *aeh)
 	return false;
 }
 
-static bool is_agps_processed(void)
-{
-#if defined(CONFIG_NRF_CLOUD_AGPS) || defined(CONFIG_NRF_CLOUD_PGPS)
-	struct nrf_modem_gnss_agps_data_frame processed;
-
-	nrf_cloud_agps_processed(&processed);
-
-	if (!processed.sv_mask_ephe) {
-		return false;
-	}
-
-#endif /* CONFIG_NRF_CLOUD_AGPS || CONFIG_NRF_CLOUD_PGPS */
-
-	return true;
-}
-
-static bool request_gnss(void)
-{
-	uint32_t uptime_current_ms = k_uptime_get();
-	int agps_wait_threshold_ms = CONFIG_APP_REQUEST_GNSS_WAIT_FOR_AGPS_THRESHOLD_SEC *
-				     MSEC_PER_SEC;
-
-	if (!IS_ENABLED(CONFIG_GNSS_MODULE)) {
-		return false;
-	}
-
-	if (!IS_ENABLED(CONFIG_APP_REQUEST_GNSS_WAIT_FOR_AGPS)) {
-		return true;
-	} else if (agps_wait_threshold_ms < 0) {
-		/* If CONFIG_APP_REQUEST_GNSS_WAIT_FOR_AGPS_THRESHOLD_SEC is set to -1,
-		 * we need to notify the data module that the application module is awaiting
-		 * A-GPS data in order to request GNSS. If not, GNSS will never be
-		 * requested if the initial A-GPS data request fails.
-		 */
-		if (is_agps_processed()) {
-			return true;
-		}
-
-		SEND_EVENT(app, APP_EVT_AGPS_NEEDED);
-		return false;
-
-	} else if ((agps_wait_threshold_ms < uptime_current_ms) || is_agps_processed()) {
-		return true;
-	}
-
-	return false;
-}
-
 static void data_sample_timer_handler(struct k_timer *timer)
 {
 	ARG_UNUSED(timer);
-
-	/* Cancel if a previous sample request has not completed or the device is not under
-	 * activity in passive mode.
-	 */
-	if (sample_request_ongoing || ((sub_state == SUB_STATE_PASSIVE_MODE) && !activity)) {
-		return;
-	}
-
-	SEND_EVENT(app, APP_EVT_DATA_GET_ALL);
-}
-
-/* Static module functions. */
-static void passive_mode_timers_start()
-{
-	LOG_DBG("Device mode: Passive");
-	LOG_DBG("Start movement timeout: %d seconds interval", app_cfg.movement_timeout);
-
-	LOG_DBG("%d seconds until movement can trigger a new data sample/publication",
-		app_cfg.movement_resolution);
-
-	k_timer_start(&data_sample_timer,
-		      K_SECONDS(app_cfg.movement_resolution),
-		      K_SECONDS(app_cfg.movement_resolution));
-
-	k_timer_start(&movement_resolution_timer,
-		      K_SECONDS(app_cfg.movement_resolution),
-		      K_SECONDS(0));
-
-	k_timer_start(&movement_timeout_timer,
-		      K_SECONDS(app_cfg.movement_timeout),
-		      K_SECONDS(app_cfg.movement_timeout));
-}
-
-static void active_mode_timers_start_all(void)
-{
-	LOG_DBG("Device mode: Active");
-	LOG_DBG("Start data sample timer: %d seconds interval", app_cfg.active_wait_timeout);
-
-	k_timer_start(&data_sample_timer,
-		      K_SECONDS(app_cfg.active_wait_timeout),
-		      K_SECONDS(app_cfg.active_wait_timeout));
-
-	k_timer_stop(&movement_resolution_timer);
-	k_timer_stop(&movement_timeout_timer);
-
-	/* Reset activity flag when changing mode. */
-	activity = false;
-}
-
-static void activity_event_handle(enum sensor_module_event_type sensor_event)
-{
-	__ASSERT(((sensor_event == SENSOR_EVT_MOVEMENT_ACTIVITY_DETECTED) ||
-		  (sensor_event == SENSOR_EVT_MOVEMENT_INACTIVITY_DETECTED)),
-		  "Unknown event");
-
-	activity = (sensor_event == SENSOR_EVT_MOVEMENT_ACTIVITY_DETECTED) ? true : false;
-
-	if (sample_request_ongoing) {
-		LOG_WRN("Sample request ongoing! Abort");
-		return;
-	}
-
-	if ((sensor_event == SENSOR_EVT_MOVEMENT_ACTIVITY_DETECTED) &&
-	    (k_timer_remaining_get(&movement_resolution_timer) != 0)) {
-		return;
-	}
-
-	SEND_EVENT(app, APP_EVT_DATA_GET_ALL);
-	passive_mode_timers_start();
+	data_get();
 }
 
 static void data_get(void)
@@ -440,49 +295,15 @@ static void data_get(void)
 	/* Set a low sample timeout. If GNSS is requested, the sample timeout will be increased to
 	 * accommodate the GNSS timeout.
 	 */
-	app_module_event->timeout = DATA_FETCH_TIMEOUT_DEFAULT;
+	app_module_event->timeout = 120;
 
 	/* Specify which data that is to be included in the transmission. */
 	app_module_event->data_list[count++] = APP_DATA_MODEM_DYNAMIC;
 	app_module_event->data_list[count++] = APP_DATA_BATTERY;
 	app_module_event->data_list[count++] = APP_DATA_ENVIRONMENTAL;
-
-	if (!modem_static_sampled) {
-		app_module_event->data_list[count++] = APP_DATA_MODEM_STATIC;
-	}
-
-	if (!app_cfg.no_data.neighbor_cell) {
-		app_module_event->data_list[count++] = APP_DATA_NEIGHBOR_CELLS;
-		app_module_event->timeout = DATA_FETCH_TIMEOUT_NEIGHBORHOOD_SEARCH;
-	}
-
-	/* The reason for having at least 75 seconds sample timeout when
-	 * requesting GNSS data is that the GNSS module on the nRF9160 modem will always
-	 * search for at least 60 seconds for the first position fix after a reboot. This limit
-	 * is enforced in order to give the modem time to perform scheduled downloads of
-	 * A-GPS data from the GNSS satellites.
-	 *
-	 * However, if A-GPS data has been downloaded via the cloud connection and processed
-	 * before the initial GNSS search, the actual GNSS timeout set by the application is used.
-	 *
-	 * Processing A-GPS before requesting GNSS data is enabled by default,
-	 * and the time that the application will wait for A-GPS data before including GNSS
-	 * in sample requests can be adjusted via the
-	 * CONFIG_APP_REQUEST_GNSS_WAIT_FOR_AGPS_THRESHOLD_SEC Kconfig option. If this option is
-	 * set to -1, the application module will not request GNSS unless A-GPS data has been
-	 * processed.
-	 *
-	 * If A-GPS data has been processed the sample timeout can be ignored as the
-	 * GNSS will most likely time out before the sample timeout expires.
-	 *
-	 * When GNSS is requested, set the sample timeout to (GNSS timeout + 15 seconds)
-	 * to let the GNSS module finish ongoing searches before data is sent to cloud.
-	 */
-
-	if (request_gnss() && !app_cfg.no_data.gnss) {
-		app_module_event->data_list[count++] = APP_DATA_GNSS;
-		app_module_event->timeout = MAX(app_cfg.gnss_timeout + 15, 75);
-	}
+	app_module_event->data_list[count++] = APP_DATA_MODEM_STATIC;
+	app_module_event->data_list[count++] = APP_DATA_NEIGHBOR_CELLS;
+	// app_module_event->data_list[count++] = APP_DATA_GNSS;
 
 	/* Set list count to number of data types passed in app_module_event. */
 	app_module_event->count = count;
@@ -491,125 +312,25 @@ static void data_get(void)
 	APP_EVENT_SUBMIT(app_module_event);
 }
 
-/* Message handler for STATE_INIT. */
-static void on_state_init(struct app_msg_data *msg)
-{
-	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_INIT)) {
-		/* Keep a copy of the new configuration. */
-		app_cfg = msg->module.data.data.cfg;
-
-		if (app_cfg.active_mode) {
-			active_mode_timers_start_all();
-		} else {
-			passive_mode_timers_start();
-		}
-
-		state_set(STATE_RUNNING);
-		sub_state_set(app_cfg.active_mode ? SUB_STATE_ACTIVE_MODE :
-						    SUB_STATE_PASSIVE_MODE);
-	}
-}
-
-/* Message handler for STATE_RUNNING. */
-static void on_state_running(struct app_msg_data *msg)
-{
-	if (IS_EVENT(msg, cloud, CLOUD_EVT_CONNECTED)) {
-		data_get();
-	}
-
-	if (IS_EVENT(msg, app, APP_EVT_DATA_GET_ALL)) {
-		data_get();
-	}
-}
-
-/* Message handler for SUB_STATE_PASSIVE_MODE. */
-void on_sub_state_passive(struct app_msg_data *msg)
-{
-	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_READY)) {
-		/* Keep a copy of the new configuration. */
-		app_cfg = msg->module.data.data.cfg;
-
-		if (app_cfg.active_mode) {
-			active_mode_timers_start_all();
-			sub_state_set(SUB_STATE_ACTIVE_MODE);
-			return;
-		}
-
-		passive_mode_timers_start();
-	}
-
-	if ((IS_EVENT(msg, sensor, SENSOR_EVT_MOVEMENT_ACTIVITY_DETECTED)) ||
-	    (IS_EVENT(msg, sensor, SENSOR_EVT_MOVEMENT_INACTIVITY_DETECTED))) {
-		activity_event_handle(msg->module.sensor.type);
-	}
-}
-
-/* Message handler for SUB_STATE_ACTIVE_MODE. */
-static void on_sub_state_active(struct app_msg_data *msg)
-{
-	if (IS_EVENT(msg, data, DATA_EVT_CONFIG_READY)) {
-		/* Keep a copy of the new configuration. */
-		app_cfg = msg->module.data.data.cfg;
-
-		if (!app_cfg.active_mode) {
-			passive_mode_timers_start();
-			sub_state_set(SUB_STATE_PASSIVE_MODE);
-			return;
-		}
-
-		active_mode_timers_start_all();
-	}
-}
-
-/* Message handler for all states. */
-static void on_all_events(struct app_msg_data *msg)
-{
-	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-		k_timer_stop(&data_sample_timer);
-		k_timer_stop(&movement_timeout_timer);
-		k_timer_stop(&movement_resolution_timer);
-
-		SEND_SHUTDOWN_ACK(app, APP_EVT_SHUTDOWN_READY, self.id);
-		state_set(STATE_SHUTDOWN);
-	}
-
-	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_READY)) {
-		modem_static_sampled = true;
-	}
-
-	if (IS_EVENT(msg, app, APP_EVT_DATA_GET)) {
-		sample_request_ongoing = true;
-	}
-
-	if (IS_EVENT(msg, data, DATA_EVT_DATA_READY)) {
-		sample_request_ongoing = false;
-	}
-
-	if (IS_EVENT(msg, sensor, SENSOR_EVT_MOVEMENT_IMPACT_DETECTED)) {
-		SEND_EVENT(app, APP_EVT_DATA_GET_ALL);
-	}
-}
+/* State table */
+static const struct smf_state state[] = {
+	[INIT] = SMF_CREATE_STATE(NULL, init_run, NULL, NULL),
+	[RUNNING] = SMF_CREATE_STATE(NULL, running_run, NULL, NULL),
+	[ACTIVE] = SMF_CREATE_STATE(active_entry, active_run, NULL, &state[RUNNING]),
+	[PASSIVE] = SMF_CREATE_STATE(passive_entry, passive_run, passive_exit, &state[RUNNING]),
+	[ACTIVITY] = SMF_CREATE_STATE(activity_entry, activity_run, activity_exit, &state[PASSIVE]),
+	[INACTIVITY] = SMF_CREATE_STATE(inactivity_entry, inactivity_run, NULL, &state[PASSIVE]),
+};
 
 void main(void)
 {
 	int err;
 	struct app_msg_data msg = { 0 };
 
-	if (!IS_ENABLED(CONFIG_LWM2M_CARRIER)) {
-		handle_nrf_modem_lib_init_ret();
-	}
+	__ASSERT(app_event_manager_init() == 0, "Application Event Manager not be initialized");
 
-	if (app_event_manager_init()) {
-		/* Without the Application Event Manager, the application will not work
-		 * as intended. A reboot is required in an attempt to recover.
-		 */
-		LOG_ERR("Application Event Manager could not be initialized, rebooting...");
-		k_sleep(K_SECONDS(5));
-		sys_reboot(SYS_REBOOT_COLD);
-	} else {
-		module_set_state(MODULE_STATE_READY);
-		SEND_EVENT(app, APP_EVT_START);
-	}
+	/* Start the rest of the system. */
+	SEND_EVENT(app, APP_EVT_START);
 
 	self.thread_id = k_current_get();
 
@@ -619,37 +340,19 @@ void main(void)
 		SEND_ERROR(app, APP_EVT_ERROR, err);
 	}
 
+	smf_set_initial(SMF_CTX(&s_obj), &state[INIT]);
+
 	while (true) {
 		module_get_next_msg(&self, &msg);
 
-		switch (state) {
-		case STATE_INIT:
-			on_state_init(&msg);
-			break;
-		case STATE_RUNNING:
-			switch (sub_state) {
-			case SUB_STATE_ACTIVE_MODE:
-				on_sub_state_active(&msg);
-				break;
-			case SUB_STATE_PASSIVE_MODE:
-				on_sub_state_passive(&msg);
-				break;
-			default:
-				LOG_WRN("Unknown application sub state");
-				break;
-			}
+		/* Set the new message. */
+		s_obj.msg = &msg;
 
-			on_state_running(&msg);
-			break;
-		case STATE_SHUTDOWN:
-			/* The shutdown state has no transition. */
-			break;
-		default:
-			LOG_WRN("Unknown application state");
+		err = smf_run_state(SMF_CTX(&s_obj));
+		if (err) {
+			__ASSERT(err == 0, "Error");
 			break;
 		}
-
-		on_all_events(&msg);
 	}
 }
 
