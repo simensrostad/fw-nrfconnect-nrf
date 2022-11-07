@@ -17,8 +17,6 @@ target_sources_ifdef(CONFIG_CLOUD_CODEC_NRF_CLOUD app
 target_sources_ifdef(CONFIG_CLOUD_CODEC_LWM2M app
                      PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lwm2m/lwm2m_codec.c)
 
-target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cloud_codec_ringbuffer.c)
-
 # Include JSON convenience APIs if used by the respective cloud codec backend.
 if (CONFIG_CLOUD_CODEC_AWS_IOT OR CONFIG_CLOUD_CODEC_AZURE_IOT_HUB OR CONFIG_CLOUD_CODEC_NRF_CLOUD)
         target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/json_helpers.c)

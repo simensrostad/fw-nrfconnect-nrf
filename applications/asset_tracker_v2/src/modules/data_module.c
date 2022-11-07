@@ -60,34 +60,14 @@ static enum state_type {
 	STATE_SHUTDOWN
 } state;
 
-/* Ringbuffers. All data received by the Data module are stored in ringbuffers.
- * Upon a LTE connection loss the device will keep sampling/storing data in
- * the buffers, and empty the buffers in batches upon a reconnect.
- */
-static struct cloud_data_gnss gnss_buf[CONFIG_DATA_GNSS_BUFFER_COUNT];
-static struct cloud_data_sensors sensors_buf[CONFIG_DATA_SENSOR_BUFFER_COUNT];
-static struct cloud_data_ui ui_buf[CONFIG_DATA_UI_BUFFER_COUNT];
-static struct cloud_data_impact impact_buf[CONFIG_DATA_IMPACT_BUFFER_COUNT];
-static struct cloud_data_battery bat_buf[CONFIG_DATA_BATTERY_BUFFER_COUNT];
-static struct cloud_data_modem_dynamic modem_dyn_buf[CONFIG_DATA_MODEM_DYNAMIC_BUFFER_COUNT];
+static struct cloud_data_gnss gnss_buf;
+static struct cloud_data_sensors sensors_buf;
+static struct cloud_data_ui ui_buf;
+static struct cloud_data_impact impact_buf;
+static struct cloud_data_battery bat_buf;
+static struct cloud_data_modem_dynamic modem_dyn_buf;
 static struct cloud_data_neighbor_cells neighbor_cells;
-
-/* Static modem data does not change between firmware versions and does not
- * have to be buffered.
- */
 static struct cloud_data_modem_static modem_stat;
-/* Size of the static modem (modem_stat) data structure.
- * Used to provide an array size when encoding batch data.
- */
-#define MODEM_STATIC_ARRAY_SIZE 1
-
-/* Head of ringbuffers. */
-static int head_gnss_buf;
-static int head_sensor_buf;
-static int head_modem_dyn_buf;
-static int head_ui_buf;
-static int head_impact_buf;
-static int head_bat_buf;
 
 static K_SEM_DEFINE(config_load_sem, 0, 1);
 
@@ -884,133 +864,18 @@ static void requested_data_list_set(enum app_module_data_type *data_list,
 
 static void new_config_handle(struct cloud_data_cfg *new_config)
 {
-	bool config_change = false;
-
-	/* Guards making sure that only new configuration values are applied. */
-	if (current_cfg.active_mode != new_config->active_mode) {
-		current_cfg.active_mode = new_config->active_mode;
-
-		if (current_cfg.active_mode) {
-			LOG_WRN("New Device mode: Active");
-		} else {
-			LOG_WRN("New Device mode: Passive");
-		}
-
-		config_change = true;
-	}
-
-	if (current_cfg.no_data.gnss != new_config->no_data.gnss) {
-		current_cfg.no_data.gnss = new_config->no_data.gnss;
-
-		if (!current_cfg.no_data.gnss) {
-			LOG_WRN("Requesting of GNSS data is enabled");
-		} else {
-			LOG_WRN("Requesting of GNSS data is disabled");
-		}
-
-		config_change = true;
-	}
-
-	if (current_cfg.no_data.neighbor_cell != new_config->no_data.neighbor_cell) {
-		current_cfg.no_data.neighbor_cell = new_config->no_data.neighbor_cell;
-
-		if (!current_cfg.no_data.neighbor_cell) {
-			LOG_WRN("Requesting of neighbor cell data is enabled");
-		} else {
-			LOG_WRN("Requesting of neighbor cell data is disabled");
-		}
-
-		config_change = true;
-	}
-
-	if (new_config->gnss_timeout > 0) {
-		if (current_cfg.gnss_timeout != new_config->gnss_timeout) {
-			current_cfg.gnss_timeout = new_config->gnss_timeout;
-
-			LOG_WRN("New GNSS timeout: %d", current_cfg.gnss_timeout);
-
-			config_change = true;
-		}
-	} else {
-		LOG_ERR("New GNSS timeout out of range: %d", new_config->gnss_timeout);
-	}
-
-	if (new_config->active_wait_timeout > 0) {
-		if (current_cfg.active_wait_timeout != new_config->active_wait_timeout) {
-			current_cfg.active_wait_timeout = new_config->active_wait_timeout;
-
-			LOG_WRN("New Active wait timeout: %d", current_cfg.active_wait_timeout);
-
-			config_change = true;
-		}
-	} else {
-		LOG_ERR("New Active timeout out of range: %d", new_config->active_wait_timeout);
-	}
-
-	if (new_config->movement_resolution > 0) {
-		if (current_cfg.movement_resolution != new_config->movement_resolution) {
-			current_cfg.movement_resolution = new_config->movement_resolution;
-
-			LOG_WRN("New Movement resolution: %d", current_cfg.movement_resolution);
-
-			config_change = true;
-		}
-	} else {
-		LOG_ERR("New Movement resolution out of range: %d",
-			new_config->movement_resolution);
-	}
-
-	if (new_config->movement_timeout > 0) {
-		if (current_cfg.movement_timeout != new_config->movement_timeout) {
-			current_cfg.movement_timeout = new_config->movement_timeout;
-
-			LOG_WRN("New Movement timeout: %d", current_cfg.movement_timeout);
-
-			config_change = true;
-		}
-	} else {
-		LOG_ERR("New Movement timeout out of range: %d", new_config->movement_timeout);
-	}
-
-	if (current_cfg.accelerometer_activity_threshold !=
-	    new_config->accelerometer_activity_threshold) {
-		current_cfg.accelerometer_activity_threshold =
-		new_config->accelerometer_activity_threshold;
-		LOG_WRN("New Accelerometer act threshold: %.2f",
-			current_cfg.accelerometer_activity_threshold);
-		config_change = true;
-	}
-	if (current_cfg.accelerometer_inactivity_threshold !=
-	    new_config->accelerometer_inactivity_threshold) {
-		current_cfg.accelerometer_inactivity_threshold =
-		new_config->accelerometer_inactivity_threshold;
-		LOG_WRN("New Accelerometer inact threshold: %.2f",
-			current_cfg.accelerometer_inactivity_threshold);
-		config_change = true;
-	}
-	if (current_cfg.accelerometer_inactivity_timeout !=
-	    new_config->accelerometer_inactivity_timeout) {
-		current_cfg.accelerometer_inactivity_timeout =
-		new_config->accelerometer_inactivity_timeout;
-		LOG_WRN("New Accelerometer inact timeout: %.2f",
-			current_cfg.accelerometer_inactivity_timeout);
-		config_change = true;
-	}
+	memcpy(&current_cfg, new_config, sizeof(struct cloud_data_cfg));
 
 	/* If there has been a change in the currently applied device configuration we want to store
 	 * the configuration to flash and distribute it to other modules.
 	 */
-	if (config_change) {
-		int err = save_config(&current_cfg, sizeof(current_cfg));
+	int err = save_config(&current_cfg, sizeof(current_cfg));
 
-		if (err) {
-			LOG_WRN("Configuration not stored, error: %d", err);
-		}
-
-		config_distribute(DATA_EVT_CONFIG_READY);
-	} else {
-		LOG_DBG("No new values in incoming device configuration update message");
+	if (err) {
+		LOG_WRN("Configuration not stored, error: %d", err);
 	}
+
+	config_distribute(DATA_EVT_CONFIG_READY);
 
 	/* Always acknowledge all configurations back to cloud to avoid a potential mismatch
 	 * between reported parameters in the cloud-side state and parameters reported by the
@@ -1160,30 +1025,7 @@ static void on_all_states(struct data_msg_data *msg)
 {
 	/* Distribute new configuration received from cloud. */
 	if (IS_EVENT(msg, cloud, CLOUD_EVT_CONFIG_RECEIVED)) {
-		struct cloud_data_cfg new = {
-			.active_mode =
-				msg->module.cloud.data.config.active_mode,
-			.active_wait_timeout =
-				msg->module.cloud.data.config.active_wait_timeout,
-			.movement_resolution =
-				msg->module.cloud.data.config.movement_resolution,
-			.movement_timeout =
-				msg->module.cloud.data.config.movement_timeout,
-			.gnss_timeout =
-				msg->module.cloud.data.config.gnss_timeout,
-			.accelerometer_activity_threshold =
-				msg->module.cloud.data.config.accelerometer_activity_threshold,
-			.accelerometer_inactivity_threshold =
-				msg->module.cloud.data.config.accelerometer_inactivity_threshold,
-			.accelerometer_inactivity_timeout =
-				msg->module.cloud.data.config.accelerometer_inactivity_timeout,
-			.no_data.gnss =
-				msg->module.cloud.data.config.no_data.gnss,
-			.no_data.neighbor_cell =
-				msg->module.cloud.data.config.no_data.neighbor_cell
-		};
-
-		new_config_handle(&new);
+		new_config_handle(&msg->module.cloud.data);
 		return;
 	}
 
@@ -1222,15 +1064,8 @@ static void on_all_states(struct data_msg_data *msg)
 	}
 
 	if (IS_EVENT(msg, ui, UI_EVT_BUTTON_DATA_READY)) {
-		struct cloud_data_ui new_ui_data = {
-			.btn = msg->module.ui.data.ui.button_number,
-			.btn_ts = msg->module.ui.data.ui.timestamp,
-			.queued = true
-		};
-
-		cloud_codec_populate_ui_buffer(ui_buf, &new_ui_data,
-					       &head_ui_buf,
-					       ARRAY_SIZE(ui_buf));
+		ui_buf.btn = msg->module.ui.data.ui.button_number,
+		ui_buf.btn_ts = msg->module.ui.data.ui.timestamp,
 
 		SEND_EVENT(data, DATA_EVT_UI_DATA_READY);
 		return;
@@ -1242,7 +1077,6 @@ static void on_all_states(struct data_msg_data *msg)
 
 	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_READY)) {
 		modem_stat.ts = msg->module.modem.data.modem_static.timestamp;
-		modem_stat.queued = true;
 
 		BUILD_ASSERT(sizeof(modem_stat.appv) >=
 			     sizeof(msg->module.modem.data.modem_static.app_version));
@@ -1273,25 +1107,14 @@ static void on_all_states(struct data_msg_data *msg)
 	}
 
 	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_DYNAMIC_DATA_READY)) {
-		struct cloud_data_modem_dynamic new_modem_data = {
-			.area = msg->module.modem.data.modem_dynamic.area_code,
-			.nw_mode = msg->module.modem.data.modem_dynamic.nw_mode,
-			.band = msg->module.modem.data.modem_dynamic.band,
-			.cell = msg->module.modem.data.modem_dynamic.cell_id,
-			.rsrp = msg->module.modem.data.modem_dynamic.rsrp,
-			.mcc = msg->module.modem.data.modem_dynamic.mcc,
-			.mnc = msg->module.modem.data.modem_dynamic.mnc,
-			.ts = msg->module.modem.data.modem_dynamic.timestamp,
-
-			.area_code_fresh = msg->module.modem.data.modem_dynamic.area_code_fresh,
-			.nw_mode_fresh = msg->module.modem.data.modem_dynamic.nw_mode_fresh,
-			.band_fresh = msg->module.modem.data.modem_dynamic.band_fresh,
-			.cell_id_fresh = msg->module.modem.data.modem_dynamic.cell_id_fresh,
-			.rsrp_fresh = msg->module.modem.data.modem_dynamic.rsrp_fresh,
-			.ip_address_fresh = msg->module.modem.data.modem_dynamic.ip_address_fresh,
-			.mccmnc_fresh = msg->module.modem.data.modem_dynamic.mccmnc_fresh,
-			.queued = true
-		};
+		modem_dyn_buf.area = msg->module.modem.data.modem_dynamic.area_code,
+		modem_dyn_buf.nw_mode = msg->module.modem.data.modem_dynamic.nw_mode,
+		modem_dyn_buf.band = msg->module.modem.data.modem_dynamic.band,
+		modem_dyn_buf.cell = msg->module.modem.data.modem_dynamic.cell_id,
+		modem_dyn_buf.rsrp = msg->module.modem.data.modem_dynamic.rsrp,
+		modem_dyn_buf.mcc = msg->module.modem.data.modem_dynamic.mcc,
+		modem_dyn_buf.mnc = msg->module.modem.data.modem_dynamic.mnc,
+		modem_dyn_buf.ts = msg->module.modem.data.modem_dynamic.timestamp,
 
 		BUILD_ASSERT(sizeof(new_modem_data.ip) >=
 			     sizeof(msg->module.modem.data.modem_dynamic.ip_address));
@@ -1306,12 +1129,6 @@ static void on_all_states(struct data_msg_data *msg)
 		strcpy(new_modem_data.apn, msg->module.modem.data.modem_dynamic.apn);
 		strcpy(new_modem_data.mccmnc, msg->module.modem.data.modem_dynamic.mccmnc);
 
-		cloud_codec_populate_modem_dynamic_buffer(
-						modem_dyn_buf,
-						&new_modem_data,
-						&head_modem_dyn_buf,
-						ARRAY_SIZE(modem_dyn_buf));
-
 		requested_data_status_set(APP_DATA_MODEM_DYNAMIC);
 	}
 
@@ -1320,33 +1137,18 @@ static void on_all_states(struct data_msg_data *msg)
 	}
 
 	if (IS_EVENT(msg, modem, MODEM_EVT_BATTERY_DATA_READY)) {
-		struct cloud_data_battery new_battery_data = {
-			.bat = msg->module.modem.data.bat.battery_voltage,
-			.bat_ts = msg->module.modem.data.bat.timestamp,
-			.queued = true
-		};
-
-		cloud_codec_populate_bat_buffer(bat_buf, &new_battery_data,
-						&head_bat_buf,
-						ARRAY_SIZE(bat_buf));
+		bat_buf.bat = msg->module.modem.data.bat.battery_voltage,
+		bat_buf.bat_ts = msg->module.modem.data.bat.timestamp,
 
 		requested_data_status_set(APP_DATA_BATTERY);
 	}
 
 	if (IS_EVENT(msg, sensor, SENSOR_EVT_ENVIRONMENTAL_DATA_READY)) {
-		struct cloud_data_sensors new_sensor_data = {
-			.temperature = msg->module.sensor.data.sensors.temperature,
-			.humidity = msg->module.sensor.data.sensors.humidity,
-			.pressure = msg->module.sensor.data.sensors.pressure,
-			.bsec_air_quality = msg->module.sensor.data.sensors.bsec_air_quality,
-			.env_ts = msg->module.sensor.data.sensors.timestamp,
-			.queued = true
-		};
-
-		cloud_codec_populate_sensor_buffer(sensors_buf,
-						   &new_sensor_data,
-						   &head_sensor_buf,
-						   ARRAY_SIZE(sensors_buf));
+		sensors_buf.temperature = msg->module.sensor.data.sensors.temperature,
+		sensors_buf.humidity = msg->module.sensor.data.sensors.humidity,
+		sensors_buf.pressure = msg->module.sensor.data.sensors.pressure,
+		sensors_buf.bsec_air_quality = msg->module.sensor.data.sensors.bsec_air_quality,
+		sensors_buf.env_ts = msg->module.sensor.data.sensors.timestamp,
 
 		requested_data_status_set(APP_DATA_ENVIRONMENTAL);
 	}
@@ -1356,57 +1158,20 @@ static void on_all_states(struct data_msg_data *msg)
 	}
 
 	if (IS_EVENT(msg, sensor, SENSOR_EVT_MOVEMENT_IMPACT_DETECTED)) {
-		struct cloud_data_impact new_impact_data = {
-			.magnitude = msg->module.sensor.data.impact.magnitude,
-			.ts = msg->module.sensor.data.impact.timestamp,
-			.queued = true
-		};
+		impact_buf.magnitude = msg->module.sensor.data.impact.magnitude,
+		impact_buf.ts = msg->module.sensor.data.impact.timestamp,
 
-		cloud_codec_populate_impact_buffer(impact_buf, &new_impact_data,
-						   &head_impact_buf,
-						   ARRAY_SIZE(impact_buf));
 		SEND_EVENT(data, DATA_EVT_IMPACT_DATA_READY);
 		return;
 	}
 
 	if (IS_EVENT(msg, gnss, GNSS_EVT_DATA_READY)) {
-		struct cloud_data_gnss new_gnss_data = {
-			.gnss_ts = msg->module.gnss.data.gnss.timestamp,
-			.queued = true,
-			.format = msg->module.gnss.data.gnss.format
-		};
-
-		switch (msg->module.gnss.data.gnss.format) {
-		case GNSS_MODULE_DATA_FORMAT_PVT: {
-			/* Add PVT data */
-			new_gnss_data.pvt.acc = msg->module.gnss.data.gnss.pvt.accuracy;
-			new_gnss_data.pvt.alt = msg->module.gnss.data.gnss.pvt.altitude;
-			new_gnss_data.pvt.hdg = msg->module.gnss.data.gnss.pvt.heading;
-			new_gnss_data.pvt.lat = msg->module.gnss.data.gnss.pvt.latitude;
-			new_gnss_data.pvt.longi = msg->module.gnss.data.gnss.pvt.longitude;
-			new_gnss_data.pvt.spd = msg->module.gnss.data.gnss.pvt.speed;
-
-		};
-			break;
-		case GNSS_MODULE_DATA_FORMAT_NMEA: {
-			/* Add NMEA data */
-			BUILD_ASSERT(sizeof(new_gnss_data.nmea) >=
-				     sizeof(msg->module.gnss.data.gnss.nmea));
-
-			strcpy(new_gnss_data.nmea, msg->module.gnss.data.gnss.nmea);
-		};
-			break;
-		case GNSS_MODULE_DATA_FORMAT_INVALID:
-			/* Fall through */
-		default:
-			LOG_WRN("Event does not carry valid GNSS data");
-			return;
-		}
-
-		cloud_codec_populate_gnss_buffer(gnss_buf, &new_gnss_data,
-						&head_gnss_buf,
-						ARRAY_SIZE(gnss_buf));
-
+		gnss_buf.pvt.acc = msg->module.gnss.data.gnss.pvt.accuracy;
+		gnss_buf.pvt.alt = msg->module.gnss.data.gnss.pvt.altitude;
+		gnss_buf.pvt.hdg = msg->module.gnss.data.gnss.pvt.heading;
+		gnss_buf.pvt.lat = msg->module.gnss.data.gnss.pvt.latitude;
+		gnss_buf.pvt.longi = msg->module.gnss.data.gnss.pvt.longitude;
+		gnss_buf.pvt.spd = msg->module.gnss.data.gnss.pvt.speed;
 		requested_data_status_set(APP_DATA_GNSS);
 	}
 
@@ -1425,7 +1190,6 @@ static void on_all_states(struct data_msg_data *msg)
 		       sizeof(neighbor_cells.neighbor_cells));
 
 		neighbor_cells.ts = msg->module.modem.data.neighbor_cells.timestamp;
-		neighbor_cells.queued = true;
 
 		requested_data_status_set(APP_DATA_NEIGHBOR_CELLS);
 	}
