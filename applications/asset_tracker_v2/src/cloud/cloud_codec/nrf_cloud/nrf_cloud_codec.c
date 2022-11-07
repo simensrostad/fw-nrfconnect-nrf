@@ -384,6 +384,13 @@ static int config_add(cJSON *parent, struct cloud_data_cfg *data, const char *ob
 		goto exit;
 	}
 
+	/* Include encoding of the configuration. This includes the value to the JSON payload. */
+	err = json_add_number(config_obj, CONFIG_DUMMY, data->dummy);
+	if (err) {
+		LOG_ERR("Encoding error: %d returned at %s:%d", err, __FILE__, __LINE__);
+		goto exit;
+	}
+
 	err = json_add_bool(config_obj, CONFIG_DEVICE_MODE, data->active_mode);
 	if (err) {
 		LOG_ERR("Encoding error: %d returned at %s:%d", err, __FILE__, __LINE__);
@@ -482,6 +489,7 @@ exit:
 
 static void config_get(cJSON *parent, struct cloud_data_cfg *data)
 {
+	cJSON *dummy = cJSON_GetObjectItem(parent, CONFIG_DUMMY);
 	cJSON *gnss_timeout = cJSON_GetObjectItem(parent, CONFIG_GNSS_TIMEOUT);
 	cJSON *active = cJSON_GetObjectItem(parent, CONFIG_DEVICE_MODE);
 	cJSON *active_wait = cJSON_GetObjectItem(parent, CONFIG_ACTIVE_TIMEOUT);
@@ -491,6 +499,13 @@ static void config_get(cJSON *parent, struct cloud_data_cfg *data)
 	cJSON *acc_inact_thres = cJSON_GetObjectItem(parent, CONFIG_ACC_INACT_THRESHOLD);
 	cJSON *acc_inact_timeout = cJSON_GetObjectItem(parent, CONFIG_ACC_INACT_TIMEOUT);
 	cJSON *nod_list = cJSON_GetObjectItem(parent, CONFIG_NO_DATA_LIST);
+
+	/* If a value named "dummy" is included in the receiving payload we decode the payload and
+	 * copy the value of the parameter.
+	 */
+	if (dummy != NULL) {
+		data->dummy = dummy->valueint;
+	}
 
 	if (gnss_timeout != NULL) {
 		data->gnss_timeout = gnss_timeout->valueint;

@@ -95,6 +95,8 @@ struct cloud_data_no_data {
 struct cloud_data_cfg {
 	/** Device mode. */
 	bool active_mode;
+	/** New configuration value. */
+	int dummy;
 	/** GNSS search timeout. */
 	int gnss_timeout;
 	/** Time between cloud publications in Active mode. */

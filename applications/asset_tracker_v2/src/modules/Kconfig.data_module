@@ -107,6 +107,12 @@ config DATA_DEVICE_MODE_PASSIVE
 
 endchoice # DATA_DEVICE_MODE #
 
+config DATA_DUMMY
+	int "Value"
+	default 2469
+	help
+	  Some help text here.
+
 config DATA_ACTIVE_TIMEOUT_SECONDS
 	int "Default active wait timeout in seconds"
 	default 120

@@ -93,6 +93,9 @@ static K_SEM_DEFINE(config_load_sem, 0, 1);
 
 /* Default device configuration. */
 static struct cloud_data_cfg current_cfg = {
+	/* Set the default value of the new variable. This value is typically overwritten with
+	 * new values set via cloud. OR stored in device flash. */
+	.dummy			 = CONFIG_DATA_DUMMY,
 	.gnss_timeout		 = CONFIG_DATA_GNSS_TIMEOUT_SECONDS,
 	.active_mode		 = IS_ENABLED(CONFIG_DATA_DEVICE_MODE_ACTIVE),
 	.active_wait_timeout	 = CONFIG_DATA_ACTIVE_TIMEOUT_SECONDS,
@@ -918,6 +921,21 @@ static void new_config_handle(struct cloud_data_cfg *new_config)
 		config_change = true;
 	}
 
+	/* Check if the new configuration value received from cloud is within bounds. If so,
+	 * copy the value into the structure that holds the current configuration of the device.
+	 */
+	if (new_config->dummy > 0) {
+		if (current_cfg.dummy != new_config->dummy) {
+			current_cfg.dummy = new_config->dummy;
+
+			LOG_WRN("New Dummy value: %d", current_cfg.dummy);
+
+			config_change = true;
+		}
+	} else {
+		LOG_ERR("New dummy value out of range: %d", new_config->dummy);
+	}
+
 	if (new_config->gnss_timeout > 0) {
 		if (current_cfg.gnss_timeout != new_config->gnss_timeout) {
 			current_cfg.gnss_timeout = new_config->gnss_timeout;
@@ -1002,6 +1020,9 @@ static void new_config_handle(struct cloud_data_cfg *new_config)
 			LOG_WRN("Configuration not stored, error: %d", err);
 		}
 
+		/* New dummy value will be distributed with this event.
+		 * Modules listen to this event and will apply relevant configurations.
+		 */
 		config_distribute(DATA_EVT_CONFIG_READY);
 	} else {
 		LOG_DBG("No new values in incoming device configuration update message");
@@ -1155,30 +1176,7 @@ static void on_all_states(struct data_msg_data *msg)
 {
 	/* Distribute new configuration received from cloud. */
 	if (IS_EVENT(msg, cloud, CLOUD_EVT_CONFIG_RECEIVED)) {
-		struct cloud_data_cfg new = {
-			.active_mode =
-				msg->module.cloud.data.config.active_mode,
-			.active_wait_timeout =
-				msg->module.cloud.data.config.active_wait_timeout,
-			.movement_resolution =
-				msg->module.cloud.data.config.movement_resolution,
-			.movement_timeout =
-				msg->module.cloud.data.config.movement_timeout,
-			.gnss_timeout =
-				msg->module.cloud.data.config.gnss_timeout,
-			.accelerometer_activity_threshold =
-				msg->module.cloud.data.config.accelerometer_activity_threshold,
-			.accelerometer_inactivity_threshold =
-				msg->module.cloud.data.config.accelerometer_inactivity_threshold,
-			.accelerometer_inactivity_timeout =
-				msg->module.cloud.data.config.accelerometer_inactivity_timeout,
-			.no_data.gnss =
-				msg->module.cloud.data.config.no_data.gnss,
-			.no_data.neighbor_cell =
-				msg->module.cloud.data.config.no_data.neighbor_cell
-		};
-
-		new_config_handle(&new);
+		new_config_handle(&msg->module.cloud.data.config);
 		return;
 	}
 
@@ -1189,6 +1187,8 @@ static void on_all_states(struct data_msg_data *msg)
 
 	if (IS_EVENT(msg, app, APP_EVT_START)) {
 		config_print_all();
+
+		/* Distribute configurations to modules in the system. */
 		config_distribute(DATA_EVT_CONFIG_INIT);
 	}
 

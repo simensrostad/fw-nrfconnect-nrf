@@ -49,6 +49,8 @@
 #define MODEM_IP_ADDRESS       "ipAddress"
 #define MODEM_IMEI             "imei"
 
+/* Add a name for the variable that will be used in the JSON schema towards nRF Cloud. */
+#define CONFIG_DUMMY			  "dummy"
 #define CONFIG_DEVICE_MODE		  "activeMode"
 #define CONFIG_ACTIVE_TIMEOUT		  "activeWaitTime"
 #define CONFIG_MOVE_TIMEOUT		  "movementTimeout"
