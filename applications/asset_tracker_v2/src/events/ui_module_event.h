@@ -26,16 +26,6 @@ enum ui_module_event_type {
 	 *  Payload is of type @ref ui_module_data (ui).
 	 */
 	UI_EVT_BUTTON_DATA_READY,
-
-	/** The UI module has performed all procedures to prepare for
-	 *  a shutdown of the system. The event carries the ID (id) of the module.
-	 */
-	UI_EVT_SHUTDOWN_READY,
-
-	/** An irrecoverable error has occurred in the cloud module. Error details are
-	 *  attached in the event structure.
-	 */
-	UI_EVT_ERROR
 };
 
 /** @brief Structure used to provide button data. */

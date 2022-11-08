@@ -32,7 +32,8 @@
 #include "events/data_module_event.h"
 #include "events/sensor_module_event.h"
 #include "events/ui_module_event.h"
-#include "events/util_module_event.h"
+#include "watchdog_app.h"
+
 #include "events/modem_module_event.h"
 #include "events/led_state_event.h"
 
@@ -51,7 +52,6 @@ struct app_msg_data {
 		struct ui_module_event ui;
 		struct sensor_module_event sensor;
 		struct data_module_event data;
-		struct util_module_event util;
 		struct modem_module_event modem;
 		struct app_module_event app;
 	} module;
@@ -283,13 +283,6 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		enqueue_msg = true;
 	}
 
-	if (is_util_module_event(aeh)) {
-		struct util_module_event *evt = cast_util_module_event(aeh);
-
-		msg.module.util = *evt;
-		enqueue_msg = true;
-	}
-
 	if (is_modem_module_event(aeh)) {
 		struct modem_module_event *evt = cast_modem_module_event(aeh);
 
@@ -309,7 +302,7 @@ static bool app_event_handler(const struct app_event_header *aeh)
 
 		if (err) {
 			LOG_ERR("Message could not be enqueued");
-			SEND_ERROR(app, APP_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 
@@ -576,15 +569,6 @@ static void on_sub_state_active(struct app_msg_data *msg)
 /* Message handler for all states. */
 static void on_all_events(struct app_msg_data *msg)
 {
-	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-		k_timer_stop(&data_sample_timer);
-		k_timer_stop(&movement_timeout_timer);
-		k_timer_stop(&movement_resolution_timer);
-
-		SEND_SHUTDOWN_ACK(app, APP_EVT_SHUTDOWN_READY, self.id);
-		state_set(STATE_SHUTDOWN);
-	}
-
 	if (IS_EVENT(msg, modem, MODEM_EVT_MODEM_STATIC_DATA_READY)) {
 		modem_static_sampled = true;
 	}
@@ -598,6 +582,14 @@ void main(void)
 	if (!IS_ENABLED(CONFIG_LWM2M_CARRIER)) {
 		handle_nrf_modem_lib_init_ret();
 	}
+
+#if defined(CONFIG_WATCHDOG_APPLICATION)
+	err = watchdog_init_and_start();
+	if (err) {
+		LOG_DBG("watchdog_init_and_start, error: %d", err);
+		module_shutdown_system();
+	}
+#endif
 
 	if (app_event_manager_init()) {
 		/* Without the Application Event Manager, the application will not work
@@ -616,7 +608,7 @@ void main(void)
 	err = module_start(&self);
 	if (err) {
 		LOG_ERR("Failed starting module, error: %d", err);
-		SEND_ERROR(app, APP_EVT_ERROR, err);
+		module_shutdown_system();
 	}
 
 	while (true) {

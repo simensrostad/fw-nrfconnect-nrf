@@ -38,12 +38,8 @@ static char *get_evt_type_str(enum data_module_event_type type)
 		return "DATA_EVT_CONFIG_GET";
 	case DATA_EVT_CONFIG_SEND:
 		return "DATA_EVT_CONFIG_SEND";
-	case DATA_EVT_SHUTDOWN_READY:
-		return "DATA_EVT_SHUTDOWN_READY";
 	case DATA_EVT_DATE_TIME_OBTAINED:
 		return "DATA_EVT_DATE_TIME_OBTAINED";
-	case DATA_EVT_ERROR:
-		return "DATA_EVT_ERROR";
 	default:
 		return "Unknown event";
 	}
@@ -53,12 +49,7 @@ static void log_event(const struct app_event_header *aeh)
 {
 	const struct data_module_event *event = cast_data_module_event(aeh);
 
-	if (event->type == DATA_EVT_ERROR) {
-		APP_EVENT_MANAGER_LOG(aeh, "%s - Error code %d",
-				get_evt_type_str(event->type), event->data.err);
-	} else {
-		APP_EVENT_MANAGER_LOG(aeh, "%s", get_evt_type_str(event->type));
-	}
+	APP_EVENT_MANAGER_LOG(aeh, "%s", get_evt_type_str(event->type));
 }
 
 #if defined(CONFIG_NRF_PROFILER)

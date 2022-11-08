@@ -17,7 +17,7 @@
 #include "events/data_module_event.h"
 #include "events/ui_module_event.h"
 #include "events/sensor_module_event.h"
-#include "events/util_module_event.h"
+
 #include "events/gnss_module_event.h"
 #include "events/modem_module_event.h"
 #include "events/cloud_module_event.h"
@@ -39,7 +39,6 @@ struct ui_msg_data {
 		struct modem_module_event modem;
 		struct data_module_event data;
 		struct gnss_module_event gnss;
-		struct util_module_event util;
 		struct cloud_module_event cloud;
 	} module;
 };
@@ -231,15 +230,6 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		struct gnss_module_event *event = cast_gnss_module_event(aeh);
 		struct ui_msg_data ui_msg = {
 			.module.gnss = *event
-		};
-
-		message_handler(&ui_msg);
-	}
-
-	if (is_util_module_event(aeh)) {
-		struct util_module_event *event = cast_util_module_event(aeh);
-		struct ui_msg_data ui_msg = {
-			.module.util = *event
 		};
 
 		message_handler(&ui_msg);
@@ -439,7 +429,7 @@ static void on_state_init(struct ui_msg_data *msg)
 
 		if (err) {
 			LOG_ERR("Failed starting module, error: %d", err);
-			SEND_ERROR(ui, UI_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 
 		state_set(STATE_RUNNING);
@@ -531,28 +521,6 @@ static void on_all_states(struct ui_msg_data *msg)
 		transition_list_append(LED_STATE_CLOUD_CONNECTING, HOLD_FOREVER);
 		k_work_reschedule(&led_pattern_update_work, K_NO_WAIT);
 		state_set(STATE_CLOUD_CONNECTING);
-	}
-
-	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-
-		transition_list_clear();
-
-		switch (msg->module.util.reason) {
-		case REASON_FOTA_UPDATE:
-			transition_list_append(LED_STATE_FOTA_UPDATE_REBOOT, HOLD_FOREVER);
-			break;
-		case REASON_GENERIC:
-			transition_list_append(LED_STATE_ERROR_SYSTEM_FAULT, HOLD_FOREVER);
-			break;
-		default:
-			LOG_WRN("Unknown shutdown reason");
-			break;
-		}
-
-		k_work_reschedule(&led_pattern_update_work, K_NO_WAIT);
-
-		SEND_SHUTDOWN_ACK(ui, UI_EVT_SHUTDOWN_READY, self.id);
-		state_set(STATE_SHUTDOWN);
 	}
 
 	if ((IS_EVENT(msg, data, DATA_EVT_CONFIG_INIT)) ||

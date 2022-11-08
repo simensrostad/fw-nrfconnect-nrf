@@ -22,10 +22,6 @@ static char *get_evt_type_str(enum sensor_module_event_type type)
 		return "SENSOR_EVT_ENVIRONMENTAL_DATA_READY";
 	case SENSOR_EVT_ENVIRONMENTAL_NOT_SUPPORTED:
 		return "SENSOR_EVT_ENVIRONMENTAL_NOT_SUPPORTED";
-	case SENSOR_EVT_SHUTDOWN_READY:
-		return "SENSOR_EVT_SHUTDOWN_READY";
-	case SENSOR_EVT_ERROR:
-		return "SENSOR_EVT_ERROR";
 	default:
 		return "Unknown event";
 	}
@@ -35,12 +31,7 @@ static void log_event(const struct app_event_header *aeh)
 {
 	const struct sensor_module_event *event = cast_sensor_module_event(aeh);
 
-	if (event->type == SENSOR_EVT_ERROR) {
-		APP_EVENT_MANAGER_LOG(aeh, "%s - Error code %d",
-				get_evt_type_str(event->type), event->data.err);
-	} else {
-		APP_EVENT_MANAGER_LOG(aeh, "%s", get_evt_type_str(event->type));
-	}
+	APP_EVENT_MANAGER_LOG(aeh, "%s", get_evt_type_str(event->type));
 }
 
 #if defined(CONFIG_NRF_PROFILER)

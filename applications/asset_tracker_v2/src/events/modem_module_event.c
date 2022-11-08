@@ -42,10 +42,6 @@ static char *get_evt_type_str(enum modem_module_event_type type)
 		return "MODEM_EVT_NEIGHBOR_CELLS_DATA_NOT_READY";
 	case MODEM_EVT_NEIGHBOR_CELLS_DATA_READY:
 		return "MODEM_EVT_NEIGHBOR_CELLS_DATA_READY";
-	case MODEM_EVT_SHUTDOWN_READY:
-		return "MODEM_EVT_SHUTDOWN_READY";
-	case MODEM_EVT_ERROR:
-		return "MODEM_EVT_ERROR";
 	case MODEM_EVT_CARRIER_INITIALIZED:
 		return "MODEM_EVT_CARRIER_INITIALIZED";
 	case MODEM_EVT_CARRIER_EVENT_LTE_LINK_UP_REQUEST:
@@ -67,12 +63,7 @@ static void log_event(const struct app_event_header *aeh)
 {
 	const struct modem_module_event *event = cast_modem_module_event(aeh);
 
-	if (event->type == MODEM_EVT_ERROR) {
-		APP_EVENT_MANAGER_LOG(aeh, "%s - Error code %d",
-				get_evt_type_str(event->type), event->data.err);
-	} else {
-		APP_EVENT_MANAGER_LOG(aeh, "%s", get_evt_type_str(event->type));
-	}
+	APP_EVENT_MANAGER_LOG(aeh, "%s", get_evt_type_str(event->type));
 }
 
 #if defined(CONFIG_NRF_PROFILER)

@@ -32,7 +32,7 @@
 #include "events/modem_module_event.h"
 #include "events/sensor_module_event.h"
 #include "events/ui_module_event.h"
-#include "events/util_module_event.h"
+
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(MODULE, CONFIG_DATA_MODULE_LOG_LEVEL);
@@ -49,7 +49,6 @@ struct data_msg_data {
 		struct sensor_module_event sensor;
 		struct data_module_event data;
 		struct app_module_event app;
-		struct util_module_event util;
 	} module;
 };
 
@@ -240,19 +239,12 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		enqueue_msg = true;
 	}
 
-	if (is_util_module_event(aeh)) {
-		struct util_module_event *event = cast_util_module_event(aeh);
-
-		msg.module.util = *event;
-		enqueue_msg = true;
-	}
-
 	if (enqueue_msg) {
 		int err = module_enqueue_msg(&self, &msg);
 
 		if (err) {
 			LOG_ERR("Message could not be enqueued");
-			SEND_ERROR(data, DATA_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 
@@ -553,7 +545,7 @@ static void data_encode(void)
 	err = lte_lc_conn_eval_params_get(&coneval);
 	if (err < 0) {
 		LOG_ERR("lte_lc_conn_eval_params_get, error: %d", err);
-		SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+		module_shutdown_system();
 		return;
 	} else if (err > 0) {
 		LOG_WRN("Connection evaluation failed, error: %d", err);
@@ -583,7 +575,7 @@ static void data_encode(void)
 			break;
 		default:
 			LOG_ERR("Error encoding neighbor cells data: %d", err);
-			SEND_ERROR(data, DATA_EVT_ERROR, err);
+			module_shutdown_system();
 			return;
 		}
 	}
@@ -613,7 +605,7 @@ static void data_encode(void)
 			break;
 		default:
 			LOG_ERR("Error encoding message %d", err);
-			SEND_ERROR(data, DATA_EVT_ERROR, err);
+			module_shutdown_system();
 			return;
 		}
 	}
@@ -647,7 +639,7 @@ static void data_encode(void)
 			break;
 		default:
 			LOG_ERR("Error batch-enconding data: %d", err);
-			SEND_ERROR(data, DATA_EVT_ERROR, err);
+			module_shutdown_system();
 			return;
 		}
 	}
@@ -744,7 +736,7 @@ static int agps_request_encode(struct nrf_modem_gnss_agps_data_frame *incoming_r
 		break;
 	default:
 		LOG_ERR("Error encoding A-GPS request: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
+		module_shutdown_system();
 		break;
 	}
 
@@ -768,7 +760,7 @@ static void config_send(void)
 		return;
 	} else if (err) {
 		LOG_ERR("Error encoding configuration, error: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
+		module_shutdown_system();
 		return;
 	}
 
@@ -797,7 +789,7 @@ static void data_ui_send(void)
 		return;
 	} else if (err) {
 		LOG_ERR("Encoding button press, error: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
+		module_shutdown_system();
 		return;
 	}
 
@@ -822,7 +814,7 @@ static void data_impact_send(void)
 		return;
 	} else if (err) {
 		LOG_ERR("Encoding impact data failed, error: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
+		module_shutdown_system();
 		return;
 	}
 
@@ -1197,14 +1189,6 @@ static void on_all_states(struct data_msg_data *msg)
 		config_distribute(DATA_EVT_CONFIG_INIT);
 	}
 
-	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-		/* The module doesn't have anything to shut down and can
-		 * report back immediately.
-		 */
-		SEND_SHUTDOWN_ACK(data, DATA_EVT_SHUTDOWN_READY, self.id);
-		state_set(STATE_SHUTDOWN);
-	}
-
 	if (IS_EVENT(msg, app, APP_EVT_DATA_GET)) {
 		/* Store which data is requested by the app, later to be used
 		 * to confirm data is reported to the data manger.
@@ -1449,7 +1433,7 @@ static void module_thread_fn(void)
 	err = module_start(&self);
 	if (err) {
 		LOG_ERR("Failed starting module, error: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
+		module_shutdown_system();
 	}
 
 	state_set(STATE_CLOUD_DISCONNECTED);
@@ -1459,7 +1443,7 @@ static void module_thread_fn(void)
 	err = setup();
 	if (err) {
 		LOG_ERR("setup, error: %d", err);
-		SEND_ERROR(data, DATA_EVT_ERROR, err);
+		module_shutdown_system();
 	}
 
 	while (true) {

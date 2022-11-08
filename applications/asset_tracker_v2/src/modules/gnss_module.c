@@ -20,7 +20,7 @@
 #include "events/app_module_event.h"
 #include "events/gnss_module_event.h"
 #include "events/data_module_event.h"
-#include "events/util_module_event.h"
+
 #include "events/modem_module_event.h"
 
 #include <zephyr/logging/log.h>
@@ -38,7 +38,6 @@ struct gnss_msg_data {
 	union {
 		struct app_module_event app;
 		struct data_module_event data;
-		struct util_module_event util;
 		struct modem_module_event modem;
 		struct gnss_module_event gnss;
 	} module;
@@ -165,15 +164,6 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		message_handler(&msg);
 	}
 
-	if (is_util_module_event(aeh)) {
-		struct util_module_event *event = cast_util_module_event(aeh);
-		struct gnss_msg_data msg = {
-			.module.util = *event
-		};
-
-		message_handler(&msg);
-	}
-
 	if (is_gnss_module_event(aeh)) {
 		struct gnss_module_event *event = cast_gnss_module_event(aeh);
 		struct gnss_msg_data msg = {
@@ -211,7 +201,7 @@ static void gnss_event_handler(int event)
 	/* Write the event into a message queue, processing is done in a separate thread. */
 	err = k_msgq_put(&event_msgq, &event, K_NO_WAIT);
 	if (err) {
-		SEND_ERROR(gnss, GNSS_EVT_ERROR_CODE, err);
+		module_shutdown_system();
 	}
 }
 
@@ -538,7 +528,7 @@ static void on_state_init(struct gnss_msg_data *msg)
 		err = setup();
 		if (err) {
 			LOG_ERR("setup, error: %d", err);
-			SEND_ERROR(gnss, GNSS_EVT_ERROR_CODE, err);
+			module_shutdown_system();
 		}
 
 		state_set(STATE_RUNNING);
@@ -599,18 +589,10 @@ static void on_all_states(struct gnss_msg_data *msg)
 		err = module_start(&self);
 		if (err) {
 			LOG_ERR("Failed starting module, error: %d", err);
-			SEND_ERROR(gnss, GNSS_EVT_ERROR_CODE, err);
+			module_shutdown_system();
 		}
 
 		state_set(STATE_INIT);
-	}
-
-	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-		/* The module doesn't have anything to shut down and can
-		 * report back immediately.
-		 */
-		SEND_SHUTDOWN_ACK(gnss, GNSS_EVT_SHUTDOWN_READY, self.id);
-		state_set(STATE_SHUTDOWN);
 	}
 }
 

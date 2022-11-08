@@ -18,8 +18,6 @@ static char *get_evt_type_str(enum debug_module_event_type type)
 		return "DEBUG_EVT_QEMU_X86_INITIALIZED";
 	case DEBUG_EVT_QEMU_X86_NETWORK_CONNECTED:
 		return "DEBUG_EVT_QEMU_X86_NETWORK_CONNECTED";
-	case DEBUG_EVT_ERROR:
-		return "DEBUG_EVT_ERROR";
 	default:
 		return "Unknown event";
 	}

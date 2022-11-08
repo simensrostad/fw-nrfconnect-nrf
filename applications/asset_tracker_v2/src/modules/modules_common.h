@@ -52,25 +52,6 @@ extern "C" {
  * @param _type Name of the type of error event.
  * @param _error_code Error code.
  */
-#define SEND_ERROR(_mod, _type, _error_code)						\
-	struct _mod ## _module_event *event = new_ ## _mod ## _module_event();		\
-	__ASSERT(event, "Not enough heap left to allocate event");			\
-	event->type = _type;								\
-	event->data.err = _error_code;							\
-	APP_EVENT_SUBMIT(event)
-
-/** @brief Macro used to submit a shutdown event.
- *
- * @param _mod Name of module that the event corresponds to.
- * @param _type Name of the type of shutdown event.
- * @param _id ID of the module that acknowledges the shutdown.
- */
-#define SEND_SHUTDOWN_ACK(_mod, _type, _id)						\
-	struct _mod ## _module_event *event = new_ ## _mod ## _module_event();		\
-	__ASSERT(event, "Not enough heap left to allocate event");			\
-	event->type = _type;								\
-	event->data.id = _id;								\
-	APP_EVENT_SUBMIT(event)
 
 /** @brief Structure that contains module metadata. */
 struct module_data {
@@ -87,6 +68,9 @@ struct module_data {
 	/* Flag signifying if the module supports shutdown. */
 	bool supports_shutdown;
 };
+
+/** @brief Shutdown the system. A reboot will occur. */
+void module_shutdown_system(void);
 
 /** @brief Purge a module's queue.
  *

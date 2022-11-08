@@ -50,16 +50,6 @@ enum app_module_event_type {
 
 	/** The application module needs A-GPS to be processed before it requests GNSS. */
 	APP_EVT_AGPS_NEEDED,
-
-	/** The application module has performed all procedures to prepare for
-	 *  a shutdown of the system.
-	 */
-	APP_EVT_SHUTDOWN_READY,
-
-	/** An irrecoverable error has occurred in the application module. Error details are
-	 *  attached in the event structure.
-	 */
-	APP_EVT_ERROR
 };
 
 /** @brief Data types that the application module requests samples for in

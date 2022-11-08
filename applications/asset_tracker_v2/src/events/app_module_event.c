@@ -48,10 +48,6 @@ static char *get_evt_type_str(enum app_module_event_type type)
 		return "APP_EVT_LTE_CONNECT";
 	case APP_EVT_LTE_DISCONNECT:
 		return "APP_EVT_LTE_DISCONNECT";
-	case APP_EVT_SHUTDOWN_READY:
-		return "APP_EVT_SHUTDOWN_READY";
-	case APP_EVT_ERROR:
-		return "APP_EVT_ERROR";
 	default:
 		return "Unknown event";
 	}
@@ -62,10 +58,7 @@ static void log_event(const struct app_event_header *aeh)
 	const struct app_module_event *event = cast_app_module_event(aeh);
 	char data_types[50] = "\0";
 
-	if (event->type == APP_EVT_ERROR) {
-		APP_EVENT_MANAGER_LOG(aeh, "%s - Error code %d",
-				get_evt_type_str(event->type), event->data.err);
-	} else if (event->type == APP_EVT_DATA_GET) {
+	if (event->type == APP_EVT_DATA_GET) {
 		for (int i = 0; i < event->count; i++) {
 			strcat(data_types, type2str(event->data_list[i]));
 

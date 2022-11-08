@@ -20,7 +20,7 @@
 #include "events/app_module_event.h"
 #include "events/data_module_event.h"
 #include "events/modem_module_event.h"
-#include "events/util_module_event.h"
+
 #include "events/cloud_module_event.h"
 
 #ifdef CONFIG_LWM2M_CARRIER
@@ -44,7 +44,6 @@ struct modem_msg_data {
 	union {
 		struct app_module_event app;
 		struct cloud_module_event cloud;
-		struct util_module_event util;
 		struct modem_module_event modem;
 	} module;
 };
@@ -161,19 +160,12 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		enqueue_msg = true;
 	}
 
-	if (is_util_module_event(aeh)) {
-		struct util_module_event *evt = cast_util_module_event(aeh);
-
-		msg.module.util = *evt;
-		enqueue_msg = true;
-	}
-
 	if (enqueue_msg) {
 		int err = module_enqueue_msg(&self, &msg);
 
 		if (err) {
 			LOG_ERR("Message could not be enqueued");
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 
@@ -183,7 +175,7 @@ static bool app_event_handler(const struct app_event_header *aeh)
 void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 {
 	LOG_ERR("Modem error: 0x%x, PC: 0x%x", fault_info->reason, fault_info->program_counter);
-	SEND_ERROR(modem, MODEM_EVT_ERROR, -EFAULT);
+	module_shutdown_system();
 }
 
 static void lte_evt_handler(const struct lte_lc_evt *const evt)
@@ -192,7 +184,7 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 	case LTE_LC_EVT_NW_REG_STATUS: {
 		if (evt->nw_reg_status == LTE_LC_NW_REG_UICC_FAIL) {
 			LOG_ERR("No SIM card detected!");
-			SEND_ERROR(modem, MODEM_EVT_ERROR, -ENOTSUP);
+			module_shutdown_system();
 			break;
 		}
 
@@ -956,7 +948,7 @@ static void on_state_init(struct modem_msg_data *msg)
 		err = lte_connect();
 		if (err) {
 			LOG_ERR("Failed connecting to LTE, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 }
@@ -980,7 +972,7 @@ static void on_state_disconnected(struct modem_msg_data *msg)
 		err = lte_connect();
 		if (err) {
 			LOG_ERR("Failed connecting to LTE, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 }
@@ -995,7 +987,7 @@ static void on_state_connecting(struct modem_msg_data *msg)
 		err = lte_lc_offline();
 		if (err) {
 			LOG_ERR("LTE disconnect failed, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 			return;
 		}
 
@@ -1020,7 +1012,7 @@ static void on_state_connected(struct modem_msg_data *msg)
 		err = lte_lc_offline();
 		if (err) {
 			LOG_ERR("LTE disconnect failed, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 
@@ -1032,7 +1024,7 @@ static void on_state_connected(struct modem_msg_data *msg)
 		err = lte_lc_offline();
 		if (err) {
 			LOG_ERR("LTE disconnect failed, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 			return;
 		}
 
@@ -1048,7 +1040,7 @@ static void on_all_states(struct modem_msg_data *msg)
 
 		if (err) {
 			LOG_ERR("lte_lc_psm_req, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 
@@ -1059,7 +1051,7 @@ static void on_all_states(struct modem_msg_data *msg)
 
 		if (err) {
 			LOG_ERR("configure_low_power, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 
@@ -1076,7 +1068,7 @@ static void on_all_states(struct modem_msg_data *msg)
 		err = lte_connect();
 		if (err) {
 			LOG_ERR("Failed connecting to LTE, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 			return;
 		}
 	}
@@ -1132,12 +1124,6 @@ static void on_all_states(struct modem_msg_data *msg)
 			}
 		}
 	}
-
-	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-		lte_lc_power_off();
-		state_set(STATE_SHUTDOWN);
-		SEND_SHUTDOWN_ACK(modem, MODEM_EVT_SHUTDOWN_READY, self.id);
-	}
 }
 
 static void module_thread_fn(void)
@@ -1150,7 +1136,7 @@ static void module_thread_fn(void)
 	err = module_start(&self);
 	if (err) {
 		LOG_ERR("Failed starting module, error: %d", err);
-		SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+		module_shutdown_system();
 	}
 
 	if (IS_ENABLED(CONFIG_LWM2M_CARRIER)) {
@@ -1162,7 +1148,7 @@ static void module_thread_fn(void)
 		err = setup();
 		if (err) {
 			LOG_ERR("Failed setting up the modem, error: %d", err);
-			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 

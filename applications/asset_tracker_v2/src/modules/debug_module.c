@@ -24,7 +24,6 @@
 #include "events/cloud_module_event.h"
 #include "events/data_module_event.h"
 #include "events/sensor_module_event.h"
-#include "events/util_module_event.h"
 #include "events/gnss_module_event.h"
 #include "events/modem_module_event.h"
 #include "events/ui_module_event.h"
@@ -36,7 +35,6 @@ LOG_MODULE_REGISTER(MODULE, CONFIG_DEBUG_MODULE_LOG_LEVEL);
 struct debug_msg_data {
 	union {
 		struct cloud_module_event cloud;
-		struct util_module_event util;
 		struct ui_module_event ui;
 		struct sensor_module_event sensor;
 		struct data_module_event data;
@@ -184,15 +182,6 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		struct data_module_event *event = cast_data_module_event(aeh);
 		struct debug_msg_data debug_msg = {
 			.module.data = *event
-		};
-
-		message_handler(&debug_msg);
-	}
-
-	if (is_util_module_event(aeh)) {
-		struct util_module_event *event = cast_util_module_event(aeh);
-		struct debug_msg_data debug_msg = {
-			.module.util = *event
 		};
 
 		message_handler(&debug_msg);
@@ -371,7 +360,7 @@ static void message_handler(struct debug_msg_data *msg)
 
 		if (err) {
 			LOG_ERR("Failed starting module, error: %d", err);
-			SEND_ERROR(debug, DEBUG_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 
 		/* Notify the rest of the application that it is connected to network

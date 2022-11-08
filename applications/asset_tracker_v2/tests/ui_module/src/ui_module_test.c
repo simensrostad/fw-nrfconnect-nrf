@@ -18,7 +18,7 @@
 #include "events/gnss_module_event.h"
 #include "events/modem_module_event.h"
 #include "events/cloud_module_event.h"
-#include "events/util_module_event.h"
+
 
 #include "src/vars_internal.h"
 

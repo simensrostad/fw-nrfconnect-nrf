@@ -20,12 +20,8 @@ static char *get_evt_type_str(enum gnss_module_event_type type)
 		return "GNSS_EVT_ACTIVE";
 	case GNSS_EVT_INACTIVE:
 		return "GNSS_EVT_INACTIVE";
-	case GNSS_EVT_SHUTDOWN_READY:
-		return "GNSS_EVT_SHUTDOWN_READY";
 	case GNSS_EVT_AGPS_NEEDED:
 		return "GNSS_EVT_AGPS_NEEDED";
-	case GNSS_EVT_ERROR_CODE:
-		return "GNSS_EVT_ERROR_CODE";
 	default:
 		return "Unknown event";
 	}
@@ -35,12 +31,7 @@ static void log_event(const struct app_event_header *aeh)
 {
 	const struct gnss_module_event *event = cast_gnss_module_event(aeh);
 
-	if (event->type == GNSS_EVT_ERROR_CODE) {
-		APP_EVENT_MANAGER_LOG(aeh, "%s - Error code %d",
-				get_evt_type_str(event->type), event->data.err);
-	} else {
-		APP_EVENT_MANAGER_LOG(aeh, "%s", get_evt_type_str(event->type));
-	}
+	APP_EVENT_MANAGER_LOG(aeh, "%s", get_evt_type_str(event->type));
 }
 
 #if defined(CONFIG_NRF_PROFILER)

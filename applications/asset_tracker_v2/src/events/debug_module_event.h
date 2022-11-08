@@ -40,11 +40,6 @@ enum debug_module_event_type {
 	 *  When built for QEMU x86 it is assumed that the application is connected to the network.
 	 */
 	DEBUG_EVT_QEMU_X86_NETWORK_CONNECTED,
-
-	/** An irrecoverable error has occurred in the debug module. Error details are
-	 *  attached in the event structure.
-	 */
-	DEBUG_EVT_ERROR
 };
 
 struct debug_module_memfault_data {

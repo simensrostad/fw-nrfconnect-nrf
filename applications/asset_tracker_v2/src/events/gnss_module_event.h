@@ -59,27 +59,12 @@ enum gnss_module_event_type {
 	/** A GNSS search has stopped, either as a result of timeout or acquired fix. */
 	GNSS_EVT_INACTIVE,
 
-	/** The module has been shut down gracefully.
-	 *  The event has associated payload of the type ``uint32`` in the struct member
-	 *  ``data.id``, which contains the module ID used when acknowledging a shutdown
-	 *  request from the util module.
-	 */
-	GNSS_EVT_SHUTDOWN_READY,
-
 	/** The modem has reported that it needs GPS assistance data.
 	 *  The event has associated payload of the type ``struct nrf_modem_gnss_agps_data_frame``
 	 *  in the event struct member ``data.agps_request``, which contains the types
 	 *  of A-GPS data that the modem needs.
 	 */
 	GNSS_EVT_AGPS_NEEDED,
-
-	/** An error has occurred, and data may have been lost.
-	 *  The event has associated payload of the type ``int`` in the struct member
-	 *  ``data.err``, which contains the original error code from that triggered
-	 *  the sending of this event.
-	 *
-	 */
-	GNSS_EVT_ERROR_CODE,
 };
 
 /** @brief Position, velocity and time (PVT) data. */

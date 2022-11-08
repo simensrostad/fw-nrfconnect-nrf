@@ -19,7 +19,7 @@
 #include "events/app_module_event.h"
 #include "events/data_module_event.h"
 #include "events/sensor_module_event.h"
-#include "events/util_module_event.h"
+
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(sensor_module, CONFIG_SENSOR_MODULE_LOG_LEVEL);
@@ -28,7 +28,6 @@ struct sensor_msg_data {
 	union {
 		struct app_module_event app;
 		struct data_module_event data;
-		struct util_module_event util;
 	} module;
 };
 
@@ -101,19 +100,12 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		enqueue_msg = true;
 	}
 
-	if (is_util_module_event(aeh)) {
-		struct util_module_event *event = cast_util_module_event(aeh);
-
-		msg.module.util = *event;
-		enqueue_msg = true;
-	}
-
 	if (enqueue_msg) {
 		int err = module_enqueue_msg(&self, &msg);
 
 		if (err) {
 			LOG_ERR("Message could not be enqueued");
-			SEND_ERROR(sensor, SENSOR_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 
@@ -360,18 +352,6 @@ static void on_state_running(struct sensor_msg_data *msg)
 	}
 }
 
-/* Message handler for all states. */
-static void on_all_states(struct sensor_msg_data *msg)
-{
-	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-		/* The module doesn't have anything to shut down and can
-		 * report back immediately.
-		 */
-		SEND_SHUTDOWN_ACK(sensor, SENSOR_EVT_SHUTDOWN_READY, self.id);
-		state_set(STATE_SHUTDOWN);
-	}
-}
-
 static void module_thread_fn(void)
 {
 	int err;
@@ -382,7 +362,7 @@ static void module_thread_fn(void)
 	err = module_start(&self);
 	if (err) {
 		LOG_ERR("Failed starting module, error: %d", err);
-		SEND_ERROR(sensor, SENSOR_EVT_ERROR, err);
+		module_shutdown_system();
 	}
 
 	state_set(STATE_INIT);
@@ -390,7 +370,7 @@ static void module_thread_fn(void)
 	err = setup();
 	if (err) {
 		LOG_ERR("setup, error: %d", err);
-		SEND_ERROR(sensor, SENSOR_EVT_ERROR, err);
+		module_shutdown_system();
 	}
 
 	while (true) {
@@ -410,8 +390,6 @@ static void module_thread_fn(void)
 			LOG_WRN("Unknown sensor module state.");
 			break;
 		}
-
-		on_all_states(&msg);
 	}
 }
 

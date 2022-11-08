@@ -106,16 +106,6 @@ enum data_module_event_type {
 
 	/** Date time has been obtained. */
 	DATA_EVT_DATE_TIME_OBTAINED,
-
-	/** The data module has performed all procedures to prepare for
-	 *  a shutdown of the system. The event carries the ID (id) of the module.
-	 */
-	DATA_EVT_SHUTDOWN_READY,
-
-	/** An irrecoverable error has occurred in the data module. Error details are
-	 *  attached in the event structure.
-	 */
-	DATA_EVT_ERROR
 };
 
 /** @brief Structure that contains a pointer to encoded data. */

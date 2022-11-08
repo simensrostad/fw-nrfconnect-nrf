@@ -87,16 +87,6 @@ enum cloud_module_event_type {
 	 *  as it has been processed.
 	 */
 	CLOUD_EVT_DATA_SEND_QOS,
-
-	/** The cloud module has performed all procedures to prepare for
-	 *  a shutdown of the system. The event carries the ID (id) of the module.
-	 */
-	CLOUD_EVT_SHUTDOWN_READY,
-
-	/** An irrecoverable error has occurred in the cloud module. Error details are
-	 *  attached in the event structure.
-	 */
-	CLOUD_EVT_ERROR
 };
 
 /** @brief Structure used to acknowledge messages sent to the cloud module. */

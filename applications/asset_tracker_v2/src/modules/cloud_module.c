@@ -28,7 +28,7 @@
 #include "events/cloud_module_event.h"
 #include "events/app_module_event.h"
 #include "events/data_module_event.h"
-#include "events/util_module_event.h"
+
 #include "events/modem_module_event.h"
 #include "events/gnss_module_event.h"
 #include "events/debug_module_event.h"
@@ -58,7 +58,6 @@ struct cloud_msg_data {
 		struct data_module_event data;
 		struct modem_module_event modem;
 		struct cloud_module_event cloud;
-		struct util_module_event util;
 		struct gnss_module_event gnss;
 		struct debug_module_event debug;
 	} module;
@@ -237,13 +236,6 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		}
 	}
 
-	if (is_util_module_event(aeh)) {
-		struct util_module_event *evt = cast_util_module_event(aeh);
-
-		msg.module.util = *evt;
-		enqueue_msg = true;
-	}
-
 	if (is_gnss_module_event(aeh)) {
 		struct gnss_module_event *evt = cast_gnss_module_event(aeh);
 
@@ -263,7 +255,7 @@ static bool app_event_handler(const struct app_event_header *aeh)
 
 		if (err) {
 			LOG_ERR("Message could not be enqueued");
-			SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 	}
 
@@ -362,7 +354,7 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 			 */
 		} else {
 			LOG_ERR("Decoding of device configuration, error: %d", err);
-			SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+			module_shutdown_system();
 			break;
 		}
 
@@ -449,7 +441,7 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 				evt->message_id);
 		} else if (err) {
 			LOG_ERR("qos_message_remove, error: %d", err);
-			SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+			module_shutdown_system();
 		}
 
 		break;
@@ -465,7 +457,7 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 	}
 	case CLOUD_WRAP_EVT_ERROR: {
 		LOG_DBG("CLOUD_WRAP_EVT_ERROR");
-		SEND_ERROR(cloud, CLOUD_EVT_ERROR, evt->err);
+		module_shutdown_system();
 		break;
 	}
 	default:
@@ -496,7 +488,7 @@ static void connect_cloud(void)
 
 	if (connect_retries > CONFIG_CLOUD_CONNECT_RETRIES) {
 		LOG_WRN("Too many failed cloud connection attempts");
-		SEND_ERROR(cloud, CLOUD_EVT_ERROR, -ENETUNREACH);
+		module_shutdown_system();
 		return;
 	}
 
@@ -606,7 +598,7 @@ void pgps_handler(struct nrf_cloud_pgps_event *event)
 			break;
 		default:
 			LOG_ERR("Error encoding P-GPS request: %d", err);
-			SEND_ERROR(data, DATA_EVT_ERROR, err);
+			module_shutdown_system();
 			return;
 		}
 	}
@@ -639,7 +631,7 @@ static void add_qos_message(uint8_t *ptr, size_t len, uint8_t type,
 		LOG_WRN("Cannot add message, internal pending list is full");
 	} else if (err) {
 		LOG_ERR("qos_message_add, error: %d", err);
-		SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+		module_shutdown_system();
 	}
 }
 
@@ -1087,14 +1079,6 @@ static void on_sub_state_cloud_disconnected(struct cloud_msg_data *msg)
 /* Message handler for all states. */
 static void on_all_states(struct cloud_msg_data *msg)
 {
-	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-		/* The module doesn't have anything to shut down and can
-		 * report back immediately.
-		 */
-		SEND_SHUTDOWN_ACK(cloud, CLOUD_EVT_SHUTDOWN_READY, self.id);
-		state_set(STATE_SHUTDOWN);
-	}
-
 	if (is_data_module_event(&msg->module.data.header)) {
 		switch (msg->module.data.type) {
 		case DATA_EVT_CONFIG_INIT:
@@ -1143,7 +1127,7 @@ static void module_thread_fn(void)
 	err = module_start(&self);
 	if (err) {
 		LOG_ERR("Failed starting module, error: %d", err);
-		SEND_ERROR(cloud, CLOUD_EVT_ERROR, err);
+		module_shutdown_system();
 	}
 
 	state_set(STATE_LTE_INIT);

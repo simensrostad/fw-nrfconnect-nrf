@@ -24,13 +24,20 @@ static K_MUTEX_DEFINE(module_list_lock);
 
 /* Structure containing general information about the modules in the application. */
 static struct modules_info {
-	/* Modules that support shutdown. */
-	atomic_t shutdown_supported_count;
 	/* Number of active modules in the application. */
 	atomic_t active_modules_count;
 } modules_info;
 
 /* Public interface */
+void module_shutdown_system()
+{
+	/* Shutdown modem */
+	/* Call link controller directly or have a callback...*/
+
+	/* Assert so that memfault will be able to capture a coredump. */
+	__ASSERT(false, "A module has requested a shutdown of the system, irrecoverable error");
+}
+
 void module_purge_queue(struct module_data *module)
 {
 	k_msgq_purge(module->msg_q);
@@ -105,46 +112,6 @@ int module_enqueue_msg(struct module_data *module, void *msg)
 	return 0;
 }
 
-bool modules_shutdown_register(uint32_t id_reg)
-{
-	bool retval = false;
-	struct module_data *module, *next_module = NULL;
-
-	if (id_reg == 0) {
-		LOG_WRN("Passed in module ID cannot be 0");
-		return false;
-	}
-
-	k_mutex_lock(&module_list_lock, K_FOREVER);
-	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&module_list, module, next_module, header) {
-		if (module->id == id_reg) {
-			if (module->supports_shutdown) {
-				/* A module shutdown has been registered. Decrease the number of
-				 * active modules in the application and delete the list entry for
-				 * the corresponding module.
-				 */
-				sys_slist_find_and_remove(&module_list, &module->header);
-				atomic_dec(&modules_info.active_modules_count);
-				atomic_dec(&modules_info.shutdown_supported_count);
-
-				LOG_WRN("Module \"%s\" shutdown registered", module->name);
-			} else {
-				goto exit;
-			}
-			break;
-		}
-	};
-
-	if (modules_info.shutdown_supported_count == 0) {
-		/* All modules in the application have reported a shutdown. */
-		retval = true;
-	}
-
-exit:
-	k_mutex_unlock(&module_list_lock);
-	return retval;
-}
-
 int module_start(struct module_data *module)
 {
 	if (module == NULL) {
@@ -159,10 +126,6 @@ int module_start(struct module_data *module)
 
 	module->id = k_cycle_get_32();
 	atomic_inc(&modules_info.active_modules_count);
-
-	if (module->supports_shutdown) {
-		atomic_inc(&modules_info.shutdown_supported_count);
-	}
 
 	/* Append passed in module metadata to linked list. */
 	k_mutex_lock(&module_list_lock, K_FOREVER);
