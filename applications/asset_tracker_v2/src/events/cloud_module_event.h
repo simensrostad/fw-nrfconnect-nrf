@@ -17,7 +17,7 @@
 #include <app_event_manager_profiler_tracer.h>
 #include <qos.h>
 
-#include "cloud/cloud_codec/cloud_codec.h"
+#include "codec/lwm2m_codec.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,9 +67,6 @@ enum cloud_module_event_type {
 	 */
 	CLOUD_EVT_CONFIG_RECEIVED,
 
-	/** An empty device configuration has been received from cloud. */
-	CLOUD_EVT_CONFIG_EMPTY,
-
 	/** A FOTA update has started. */
 	CLOUD_EVT_FOTA_START,
 
@@ -78,15 +75,6 @@ enum cloud_module_event_type {
 
 	/** An error occurred during a FOTA update. */
 	CLOUD_EVT_FOTA_ERROR,
-
-	/** Sending data to cloud using QoS library.
-	 *  The payload associated with this event is of type @ref qos_data (message).
-	 *
-	 *  This event is only meant for the cloud module and is used to filter QoS data through
-	 *  the module's internal message queue. This event is consumed by the cloud module as soon
-	 *  as it has been processed.
-	 */
-	CLOUD_EVT_DATA_SEND_QOS,
 
 	/** The cloud module has performed all procedures to prepare for
 	 *  a shutdown of the system. The event carries the ID (id) of the module.
@@ -121,8 +109,6 @@ struct cloud_module_event {
 		 *  to free allocated data post transmission.
 		 */
 		struct cloud_module_data_ack ack;
-		/** Variable that contains the message that should be sent to cloud. */
-		struct qos_data message;
 		/** Module ID, used when acknowledging shutdown requests. */
 		uint32_t id;
 		/** Code signifying the cause of error. */

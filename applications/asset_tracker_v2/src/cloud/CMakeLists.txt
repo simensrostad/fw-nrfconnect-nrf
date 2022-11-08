@@ -5,18 +5,6 @@
 #
 
 target_include_directories(app PRIVATE .)
-add_subdirectory(cloud_codec)
-target_sources_ifdef(CONFIG_AWS_IOT app
-                     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/aws_iot_integration.c)
 
-target_sources_ifdef(CONFIG_AZURE_IOT_HUB app
-                     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/azure_iot_hub_integration.c)
-
-target_sources_ifdef(CONFIG_NRF_CLOUD_MQTT app
-                     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/nrf_cloud_integration.c)
-
-target_sources_ifdef(CONFIG_LWM2M_INTEGRATION app
-                     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lwm2m_integration/lwm2m_integration.c)
-
-target_sources_ifdef(CONFIG_LWM2M_INTEGRATION app
-                     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lwm2m_integration/configuration_object.c)
+target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lwm2m_integration.c)
+target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/configuration_object.c)

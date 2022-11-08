@@ -15,7 +15,7 @@
 
 #include <app_event_manager.h>
 #include <app_event_manager_profiler_tracer.h>
-#include "cloud/cloud_codec/cloud_codec.h"
+#include "codec/lwm2m_codec.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,12 +55,6 @@ enum data_module_event_type {
 
 	/** UI button data is ready to be sent. */
 	DATA_EVT_UI_DATA_READY,
-
-	/** Impact data is ready to be sent. */
-	DATA_EVT_IMPACT_DATA_READY,
-
-	/** Send impact data, similar to DATA_EVT_UI_DATA_SEND */
-	DATA_EVT_IMPACT_DATA_SEND,
 
 	/** Send neighbor cell measurements.
 	 *  The event has an associated payload of type @ref data_module_data_buffers in
@@ -120,8 +114,6 @@ enum data_module_event_type {
 
 /** @brief Structure that contains a pointer to encoded data. */
 struct data_module_data_buffers {
-	char *buf;
-	size_t len;
 	/** Object paths used in lwM2M. NULL terminated. */
 	char paths[CONFIG_CLOUD_CODEC_LWM2M_PATH_LIST_ENTRIES_MAX]
 		  [CONFIG_CLOUD_CODEC_LWM2M_PATH_ENTRY_SIZE_MAX];

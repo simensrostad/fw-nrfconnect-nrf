@@ -316,54 +316,6 @@ static bool app_event_handler(const struct app_event_header *aeh)
 	return false;
 }
 
-static bool is_agps_processed(void)
-{
-#if defined(CONFIG_NRF_CLOUD_AGPS) || defined(CONFIG_NRF_CLOUD_PGPS)
-	struct nrf_modem_gnss_agps_data_frame processed;
-
-	nrf_cloud_agps_processed(&processed);
-
-	if (!processed.sv_mask_ephe) {
-		return false;
-	}
-
-#endif /* CONFIG_NRF_CLOUD_AGPS || CONFIG_NRF_CLOUD_PGPS */
-
-	return true;
-}
-
-static bool request_gnss(void)
-{
-	uint32_t uptime_current_ms = k_uptime_get();
-	int agps_wait_threshold_ms = CONFIG_APP_REQUEST_GNSS_WAIT_FOR_AGPS_THRESHOLD_SEC *
-				     MSEC_PER_SEC;
-
-	if (!IS_ENABLED(CONFIG_GNSS_MODULE)) {
-		return false;
-	}
-
-	if (!IS_ENABLED(CONFIG_APP_REQUEST_GNSS_WAIT_FOR_AGPS)) {
-		return true;
-	} else if (agps_wait_threshold_ms < 0) {
-		/* If CONFIG_APP_REQUEST_GNSS_WAIT_FOR_AGPS_THRESHOLD_SEC is set to -1,
-		 * we need to notify the data module that the application module is awaiting
-		 * A-GPS data in order to request GNSS. If not, GNSS will never be
-		 * requested if the initial A-GPS data request fails.
-		 */
-		if (is_agps_processed()) {
-			return true;
-		}
-
-		SEND_EVENT(app, APP_EVT_AGPS_NEEDED);
-		return false;
-
-	} else if ((agps_wait_threshold_ms < uptime_current_ms) || is_agps_processed()) {
-		return true;
-	}
-
-	return false;
-}
-
 static void data_sample_timer_handler(struct k_timer *timer)
 {
 	ARG_UNUSED(timer);
@@ -460,7 +412,7 @@ static void data_get(void)
 	 * to let the GNSS module finish ongoing searches before data is sent to cloud.
 	 */
 
-	if (request_gnss() && !app_cfg.no_data.gnss) {
+	if (!app_cfg.no_data.gnss) {
 		app_module_event->data_list[count++] = APP_DATA_GNSS;
 		app_module_event->timeout = MAX(app_cfg.gnss_timeout + 15, 75);
 	}

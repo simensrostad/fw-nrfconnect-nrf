@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <cloud_codec.h>
 #include <zephyr/types.h>
 #include <stdbool.h>
 #include <string.h>
@@ -17,6 +16,7 @@
 #include <net/lwm2m_client_utils_location.h>
 #include <date_time.h>
 
+#include <lwm2m_codec.h>
 #include "lwm2m_codec_defines.h"
 
 #include <zephyr/logging/log.h>

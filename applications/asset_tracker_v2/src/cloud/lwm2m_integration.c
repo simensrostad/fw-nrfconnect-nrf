@@ -14,7 +14,7 @@
 #include <zephyr/net/socket.h>
 #include <hw_id.h>
 
-#include "cloud/cloud_wrapper.h"
+#include "cloud/lwm2m_integration.h"
 
 #define MODULE lwm2m_integration
 

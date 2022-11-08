@@ -470,39 +470,6 @@ int cloud_codec_encode_batch_data(struct cloud_codec_data *output,
 				  size_t impact_buf_count,
 				  size_t bat_buf_count);
 
-void cloud_codec_populate_sensor_buffer(
-				struct cloud_data_sensors *sensor_buffer,
-				struct cloud_data_sensors *new_sensor_data,
-				int *head_sensor_buf,
-				size_t buffer_count);
-
-void cloud_codec_populate_ui_buffer(struct cloud_data_ui *ui_buffer,
-				    struct cloud_data_ui *new_ui_data,
-				    int *head_ui_buf,
-				    size_t buffer_count);
-
-void cloud_codec_populate_impact_buffer(
-				struct cloud_data_impact *impact_buf,
-				struct cloud_data_impact *new_impact_data,
-				int *head_impact_buf,
-				size_t buffer_count);
-
-void cloud_codec_populate_bat_buffer(struct cloud_data_battery *bat_buffer,
-				     struct cloud_data_battery *new_bat_data,
-				     int *head_bat_buf,
-				     size_t buffer_count);
-
-void cloud_codec_populate_gnss_buffer(struct cloud_data_gnss *gnss_buffer,
-				     struct cloud_data_gnss *new_gnss_data,
-				     int *head_gnss_buf,
-				     size_t buffer_count);
-
-void cloud_codec_populate_modem_dynamic_buffer(
-				struct cloud_data_modem_dynamic *modem_buffer,
-				struct cloud_data_modem_dynamic *new_modem_data,
-				int *head_modem_buf,
-				size_t buffer_count);
-
 /**
  * @}
  */
