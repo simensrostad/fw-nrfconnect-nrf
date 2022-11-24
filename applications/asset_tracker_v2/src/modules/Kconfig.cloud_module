@@ -23,6 +23,14 @@ config NRF_CLOUD_AGPS
 	default n if NRF_CLOUD_PGPS && LWM2M_INTEGRATION
 	default y
 
+# Enable external handling of A-GPS in the location API if nRF Cloud A-GPS is set.
+if NRF_CLOUD_AGPS
+
+config LOCATION_METHOD_GNSS_AGPS_EXTERNAL
+	default y
+
+endif # NRF_CLOUD_AGPS
+
 # Enable MQTT clean session by default. This is to ensure that the configured cloud MQTT service
 # client library always subscribes to the necessary topics.
 config MQTT_CLEAN_SESSION
