@@ -432,6 +432,16 @@ int cloud_wrap_connect(void)
 {
 	int err;
 
+	LOG_WRN("Cloud connection attempt");
+
+	/* When the lwm2m security object requests LTE mode changes for credential writing
+	 * (via modem_mode_request_cb), the connection state of the lwm2m engine is still
+	 * considered connected.
+	 */
+	if (state == CONNECTED) {
+		return -EISCONN;
+	}
+
 	if (state != DISCONNECTED) {
 		return -EINPROGRESS;
 	}

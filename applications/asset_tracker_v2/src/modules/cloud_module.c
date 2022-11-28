@@ -460,12 +460,6 @@ static void connect_cloud(void)
 
 	LOG_DBG("Connecting to cloud");
 
-	if (connect_retries > CONFIG_CLOUD_CONNECT_RETRIES) {
-		LOG_WRN("Too many failed cloud connection attempts");
-		SEND_ERROR(cloud, CLOUD_EVT_ERROR, -ENETUNREACH);
-		return;
-	}
-
 	/* The cloud will return error if cloud_wrap_connect() is called while
 	 * the socket is polled on in the internal cloud thread or the
 	 * cloud backend is the wrong state. We cannot treat this as an error as
@@ -473,11 +467,20 @@ static void connect_cloud(void)
 	 * conditions.
 	 */
 	err = cloud_wrap_connect();
-	if (err) {
+	if (err == -EISCONN) {
+		LOG_DBG("Cloud integration layer is already connected, abort reconnection work");
+		return;
+	} else {
 		LOG_ERR("cloud_connect failed, error: %d", err);
 	}
 
 	connect_retries++;
+
+	if (connect_retries > CONFIG_CLOUD_CONNECT_RETRIES) {
+		LOG_WRN("Too many failed cloud connection attempts");
+		SEND_ERROR(cloud, CLOUD_EVT_ERROR, -ENETUNREACH);
+		return;
+	}
 
 	LOG_DBG("Cloud connection establishment in progress");
 	LOG_DBG("New connection attempt in %d seconds if not successful",
