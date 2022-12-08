@@ -12,6 +12,11 @@ menuconfig MODEM_INFO
 
 if MODEM_INFO
 
+config MODEM_INFO_AUTO_INIT
+	bool "Auto initialize library"
+	help
+	  Initialize library with SYS_INIT before the application starts.
+
 config MODEM_INFO_MAX_AT_PARAMS_RSP
 	int "Maximum number of response parameters"
 	default 10

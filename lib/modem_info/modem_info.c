@@ -869,12 +869,36 @@ int modem_info_get_rsrp(int *val)
 int modem_info_init(void)
 {
 	int err = 0;
+	static int initialized;
+
+	if (initialized) {
+		return 0;
+	}
 
 	if (m_param_list.params == NULL) {
 		/* Init at_cmd_parser storage module */
-		err = at_params_list_init(&m_param_list,
-					  CONFIG_MODEM_INFO_MAX_AT_PARAMS_RSP);
+		err = at_params_list_init(&m_param_list, CONFIG_MODEM_INFO_MAX_AT_PARAMS_RSP);
 	}
+
+	initialized = true;
 
 	return err;
 }
+
+static int init(const struct device *unused)
+{
+	ARG_UNUSED(unused);
+
+	int err = modem_info_init();
+
+	if (err) {
+		LOG_ERR("modem_info_init, error: %d", err);
+		return err;
+	}
+
+	return 0;
+}
+
+#if defined(CONFIG_MODEM_INFO_AUTO_INIT)
+SYS_INIT(init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+#endif /* CONFIG_MODEM_INFO_AUTO_INIT */
