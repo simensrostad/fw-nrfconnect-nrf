@@ -1,0 +1,23 @@
+#
+# Copyright (c) 2019 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig MODEM_INIT_HANDLER
+	bool "FOTA Utils"
+	depends on NRF_MODEM_LIB
+	help
+	  Library that handles the return value from initialization of the nRF Modem library.
+	  The library will perform a reboot if modem DFU was successful.
+	  It will also call the required functions that are related to specific FOTA libraries
+	  beforehand. This library is not compatible with full modem FOTA.
+
+if MODEM_INIT_HANDLER
+
+module=MODEM_INIT_HANDLER
+module-dep=LOG
+module-str=Modem initialization handler
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif # MODEM_INIT_HANDLER

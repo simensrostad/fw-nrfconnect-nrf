@@ -6,6 +6,7 @@
 menuconfig AWS_FOTA
 	bool "AWS Jobs FOTA library"
 	select AWS_JOBS
+	select MODEM_INIT_HANDLER if NRF_MODEM_LIB
 	depends on FOTA_DOWNLOAD
 	depends on CJSON_LIB
 	depends on !BOARD_QEMU_X86
