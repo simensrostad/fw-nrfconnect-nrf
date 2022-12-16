@@ -885,6 +885,7 @@ int modem_info_init(void)
 	return err;
 }
 
+#if defined(CONFIG_MODEM_INFO_AUTO_INIT)
 static int init(const struct device *unused)
 {
 	ARG_UNUSED(unused);
@@ -899,6 +900,5 @@ static int init(const struct device *unused)
 	return 0;
 }
 
-#if defined(CONFIG_MODEM_INFO_AUTO_INIT)
 SYS_INIT(init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 #endif /* CONFIG_MODEM_INFO_AUTO_INIT */

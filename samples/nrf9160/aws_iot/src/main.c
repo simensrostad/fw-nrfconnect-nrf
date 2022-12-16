@@ -11,8 +11,7 @@
 #include <modem/lte_lc.h>
 #include <modem/nrf_modem_lib.h>
 #include <modem/modem_info.h>
-#include <nrf_modem.h>
-#endif
+#endif /* CONFIG_NRF_MODEM_LIB */
 #include <net/aws_iot.h>
 #include <zephyr/sys/reboot.h>
 #include <date_time.h>
@@ -20,31 +19,23 @@
 #include <cJSON.h>
 #include <cJSON_os.h>
 
-BUILD_ASSERT(!IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT),
-		"This sample does not support LTE auto-init and connect");
-
-#define APP_TOPICS_COUNT CONFIG_AWS_IOT_APP_SUBSCRIPTION_LIST_COUNT
+BUILD_ASSERT(!IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT), "Auto-init and connect not supported");
 
 static struct k_work_delayable shadow_update_work;
-static struct k_work_delayable connect_work;
+static struct k_work_delayable aws_iot_connect_work;
 static struct k_work shadow_update_version_work;
 
-static bool cloud_connected;
+static bool cloud_connected, lte_connected;
+static char modem_fw_version[50];
 
-static K_SEM_DEFINE(lte_connected, 0, 1);
+static K_SEM_DEFINE(lte_connected_sem, 0, 1);
 static K_SEM_DEFINE(date_time_obtained, 0, 1);
 
-#if defined(CONFIG_NRF_MODEM_LIB)
-NRF_MODEM_LIB_ON_INIT(aws_iot_init_hook, on_modem_lib_init, NULL);
-
-/* Initialized to value different than success (0) */
-static int modem_lib_init_result = -1;
-
-static void on_modem_lib_init(int ret, void *ctx)
-{
-	modem_lib_init_result = ret;
-}
-#endif
+/* Forward declarations */
+static void date_time_event_handler(const struct date_time_evt *evt);
+#if defined(CONFIG_LTE_LINK_CONTROL)
+static void lte_handler(const struct lte_lc_evt *const evt);
+#endif /* CONFIG_LTE_LINK_CONTROL */
 
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
@@ -79,7 +70,7 @@ static int json_add_number(cJSON *parent, const char *str, double item)
 
 static int shadow_update(bool version_number_include)
 {
-	int err;
+	int err, len = 0;
 	char *message;
 	int64_t message_ts = 0;
 	int16_t bat_voltage = 0;
@@ -92,10 +83,10 @@ static int shadow_update(bool version_number_include)
 
 #if defined(CONFIG_NRF_MODEM_LIB)
 	/* Request battery voltage data from the modem. */
-	err = modem_info_short_get(MODEM_INFO_BATTERY, &bat_voltage);
-	if (err != sizeof(bat_voltage)) {
+	len = modem_info_short_get(MODEM_INFO_BATTERY, &bat_voltage);
+	if (len != sizeof(bat_voltage)) {
 		printk("modem_info_short_get, error: %d\n", err);
-		return err;
+		return -ENFILE;
 	}
 #endif
 
@@ -107,19 +98,16 @@ static int shadow_update(bool version_number_include)
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
-		err = -ENOMEM;
-		return err;
+		return -ENOMEM;
 	}
 
 	if (version_number_include) {
-		err = json_add_str(reported_obj, "app_version",
-				    CONFIG_APP_VERSION);
-	} else {
-		err = 0;
+		err += json_add_str(reported_obj, "app_version", CONFIG_APP_VERSION);
+		err += json_add_str(reported_obj, "modem_version", modem_fw_version);
 	}
 
 	err += json_add_number(reported_obj, "batv", bat_voltage);
-	err += json_add_number(reported_obj, "ts", message_ts);
+	err += json_add_number(reported_obj, "ts", (double)message_ts);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
@@ -158,9 +146,16 @@ cleanup:
 	return err;
 }
 
-static void connect_work_fn(struct k_work *work)
+static void aws_iot_connect_work_fn(struct k_work *work)
 {
+	ARG_UNUSED(work);
+
 	int err;
+
+	if (!lte_connected) {
+		printk("LTE is not connected! Abort cloud connection attempt\n");
+		goto schedule_connection_attempt;
+	}
 
 	if (cloud_connected) {
 		return;
@@ -171,15 +166,15 @@ static void connect_work_fn(struct k_work *work)
 		printk("aws_iot_connect, error: %d\n", err);
 	}
 
-	printk("Next connection retry in %d seconds\n",
-	       CONFIG_CONNECTION_RETRY_TIMEOUT_SECONDS);
-
-	k_work_schedule(&connect_work,
-			K_SECONDS(CONFIG_CONNECTION_RETRY_TIMEOUT_SECONDS));
+schedule_connection_attempt:
+	printk("Next connection retry in %d seconds\n", CONFIG_CONNECTION_RETRY_TIMEOUT_SECONDS);
+	(void)k_work_schedule(&aws_iot_connect_work, K_SECONDS(CONFIG_CONNECTION_RETRY_TIMEOUT_SECONDS));
 }
 
 static void shadow_update_work_fn(struct k_work *work)
 {
+	ARG_UNUSED(work);
+
 	int err;
 
 	if (!cloud_connected) {
@@ -191,15 +186,14 @@ static void shadow_update_work_fn(struct k_work *work)
 		printk("shadow_update, error: %d\n", err);
 	}
 
-	printk("Next data publication in %d seconds\n",
-	       CONFIG_PUBLICATION_INTERVAL_SECONDS);
-
-	k_work_schedule(&shadow_update_work,
-			K_SECONDS(CONFIG_PUBLICATION_INTERVAL_SECONDS));
+	printk("Next data publication in %d seconds\n", CONFIG_PUBLICATION_INTERVAL_SECONDS);
+	(void)k_work_schedule(&shadow_update_work, K_SECONDS(CONFIG_PUBLICATION_INTERVAL_SECONDS));
 }
 
 static void shadow_update_version_work_fn(struct k_work *work)
 {
+	ARG_UNUSED(work);
+
 	int err;
 
 	err = shadow_update(true);
@@ -208,8 +202,7 @@ static void shadow_update_version_work_fn(struct k_work *work)
 	}
 }
 
-static void print_received_data(const char *buf, const char *topic,
-				size_t topic_len)
+static void print_received_data(const char *buf, const char *topic, size_t topic_len)
 {
 	char *str = NULL;
 	cJSON *root_obj = NULL;
@@ -235,6 +228,91 @@ clean_exit:
 	cJSON_Delete(root_obj);
 }
 
+/* Connect to LTE and AWS IoT */
+static void connect(void)
+{
+	/* Cancel ongoing connect work, if any. */
+	(void)k_work_cancel_delayable(&aws_iot_connect_work);
+
+#if defined(CONFIG_NRF_MODEM_LIB)
+	(void)modem_info_string_get(MODEM_INFO_FW_VERSION,
+				    modem_fw_version,
+				    sizeof(modem_fw_version));
+
+	printk("Current modem firwmare version: %s\n", modem_fw_version);
+
+	int err = lte_lc_init_and_connect_async(lte_handler);
+
+	if (err) {
+		printk("Failed to configure the modem, error: %d\n", err);
+		return;
+	}
+
+	k_sem_take(&lte_connected_sem, K_FOREVER);
+#endif /* CONFIG_NRF_MODEM_LIB */
+
+	/* Trigger a date time update. The date_time API is used to timestamp data that is sent
+	 * to AWS IoT.
+	 */
+	date_time_update_async(date_time_event_handler);
+
+	/* Postpone connecting to AWS IoT until date time has been obtained. */
+	k_sem_take(&date_time_obtained, K_FOREVER);
+	(void)k_work_schedule(&aws_iot_connect_work, K_NO_WAIT);
+}
+
+/* Function that reinitializes the nRF Modem library and connects to LTE and AWS IoT. */
+#if defined(CONFIG_NRF_MODEM_LIB)
+static void reinit_modem_and_connect(void)
+{
+	int err;
+
+	/* Gracefully disconnect from AWS IoT before reinitializing the modem. */
+	(void)aws_iot_disconnect();
+
+	/* Deinitialize Link controller to put modem in offline mode.
+	 * This is a requirement for reinitializing the modem.
+	 */
+	(void)lte_lc_deinit();
+
+	/* Shutdown and initialize the nRF Modem library to perform the update.
+	 * Expect that nrf_modem_lib_init returns MODEM_DFU_RESULT_OK which signifies that DFU
+	 * completed successfully and a reboot (reinitialization) is needed.
+	 */
+	err = nrf_modem_lib_shutdown();
+	if (err) {
+		printk("Failed shutting down the modem\n");
+		return;
+	}
+
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if ((err < 0) || ((err > 0) && (err != MODEM_DFU_RESULT_OK))) {
+		printk("Initializing the modem failed (perform update), error: %d\n", err);
+		return;
+	}
+
+	/* Shutdown and initialize the nRF Modem library again to run the new firmware.
+	 * Expect that nrf_modem_lib_init returns 0 which signifies that the modem has been
+	 * successfully initialized and the new firmware is running.
+	 */
+	err = nrf_modem_lib_shutdown();
+	if (err) {
+		printk("Failed shutting down the modem\n");
+		return;
+	}
+
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if ((err < 0) || ((err > 0) && (err != MODEM_DFU_RESULT_OK))) {
+		printk("Initializing the modem failed (run the new image), error: %d\n", err);
+		return;
+	}
+
+	printk("Modem reinitialized");
+
+	connect();
+}
+#endif /* CONFIG_NRF_MODEM_LIB */
+
 void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 {
 	switch (evt->type) {
@@ -245,12 +323,13 @@ void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 		printk("AWS_IOT_EVT_CONNECTED\n");
 
 		cloud_connected = true;
+
 		/* This may fail if the work item is already being processed,
 		 * but in such case, the next time the work handler is executed,
 		 * it will exit after checking the above flag and the work will
 		 * not be scheduled again.
 		 */
-		(void)k_work_cancel_delayable(&connect_work);
+		(void)k_work_cancel_delayable(&aws_iot_connect_work);
 
 		if (evt->data.persistent_session) {
 			printk("Persistent session enabled\n");
@@ -266,15 +345,16 @@ void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 		/** Send version number to AWS IoT broker to verify that the
 		 *  FOTA update worked.
 		 */
-		k_work_submit(&shadow_update_version_work);
+		(void)k_work_submit(&shadow_update_version_work);
 
 		/** Start sequential shadow data updates.
 		 */
-		k_work_schedule(&shadow_update_work,
-				K_SECONDS(CONFIG_PUBLICATION_INTERVAL_SECONDS));
+		(void)k_work_schedule(&shadow_update_work,
+				      K_SECONDS(CONFIG_PUBLICATION_INTERVAL_SECONDS));
 
 #if defined(CONFIG_NRF_MODEM_LIB)
 		int err = lte_lc_psm_req(true);
+
 		if (err) {
 			printk("Requesting PSM failed, error: %d\n", err);
 		}
@@ -285,19 +365,26 @@ void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 		break;
 	case AWS_IOT_EVT_DISCONNECTED:
 		printk("AWS_IOT_EVT_DISCONNECTED\n");
+
 		cloud_connected = false;
+
 		/* This may fail if the work item is already being processed,
 		 * but in such case, the next time the work handler is executed,
 		 * it will exit after checking the above flag and the work will
 		 * not be scheduled again.
 		 */
 		(void)k_work_cancel_delayable(&shadow_update_work);
-		k_work_schedule(&connect_work, K_NO_WAIT);
+
+		/* Attempt to reconnect in 5 seconds. */
+		(void)k_work_schedule(&aws_iot_connect_work, K_SECONDS(5));
 		break;
 	case AWS_IOT_EVT_DATA_RECEIVED:
 		printk("AWS_IOT_EVT_DATA_RECEIVED\n");
-		print_received_data(evt->data.msg.ptr, evt->data.msg.topic.str,
+
+		print_received_data(evt->data.msg.ptr,
+				    evt->data.msg.topic.str,
 				    evt->data.msg.topic.len);
+
 		break;
 	case AWS_IOT_EVT_PUBACK:
 		printk("AWS_IOT_EVT_PUBACK, message ID: %d\n", evt->data.message_id);
@@ -307,33 +394,28 @@ void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 		break;
 	case AWS_IOT_EVT_FOTA_ERASE_PENDING:
 		printk("AWS_IOT_EVT_FOTA_ERASE_PENDING\n");
-		printk("Disconnect LTE link or reboot\n");
-#if defined(CONFIG_NRF_MODEM_LIB)
-		err = lte_lc_offline();
-		if (err) {
-			printk("Error disconnecting from LTE\n");
-		}
-#endif
 		break;
 	case AWS_IOT_EVT_FOTA_ERASE_DONE:
 		printk("AWS_FOTA_EVT_ERASE_DONE\n");
-		printk("Reconnecting the LTE link");
-#if defined(CONFIG_NRF_MODEM_LIB)
-		err = lte_lc_connect();
-		if (err) {
-			printk("Error connecting to LTE\n");
-		}
-#endif
 		break;
-	case AWS_IOT_EVT_FOTA_DONE:
-		printk("AWS_IOT_EVT_FOTA_DONE\n");
-		printk("FOTA done, rebooting device\n");
-		aws_iot_disconnect();
-		sys_reboot(0);
+	case AWS_IOT_EVT_FOTA_APPLICATION_DONE:
+		printk("AWS_IOT_EVT_FOTA_APPLICATION_DONE\n");
+		printk("Application image update done, rebooting device\n");
+
+		(void)aws_iot_disconnect();
+		(void)sys_reboot(0);
+
+		break;
+	case AWS_IOT_EVT_FOTA_MODEM_DELTA_DONE:
+		printk("AWS_IOT_EVT_FOTA_MODEM_DELTA_DONE\n");
+		printk("Modem delta image update done\n");
+
+		reinit_modem_and_connect();
+
 		break;
 	case AWS_IOT_EVT_FOTA_DL_PROGRESS:
-		printk("AWS_IOT_EVT_FOTA_DL_PROGRESS, (%d%%)",
-		       evt->data.fota_progress);
+		printk("AWS_IOT_EVT_FOTA_DL_PROGRESS, (%d%%)\n", evt->data.fota_progress);
+		break;
 	case AWS_IOT_EVT_ERROR:
 		printk("AWS_IOT_EVT_ERROR, %d\n", evt->data.err);
 		break;
@@ -348,9 +430,9 @@ void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 
 static void work_init(void)
 {
-	k_work_init_delayable(&shadow_update_work, shadow_update_work_fn);
-	k_work_init_delayable(&connect_work, connect_work_fn);
-	k_work_init(&shadow_update_version_work, shadow_update_version_work_fn);
+	(void)k_work_init_delayable(&shadow_update_work, shadow_update_work_fn);
+	(void)k_work_init_delayable(&aws_iot_connect_work, aws_iot_connect_work_fn);
+	(void)k_work_init(&shadow_update_version_work, shadow_update_version_work_fn);
 }
 
 #if defined(CONFIG_NRF_MODEM_LIB)
@@ -360,6 +442,7 @@ static void lte_handler(const struct lte_lc_evt *const evt)
 	case LTE_LC_EVT_NW_REG_STATUS:
 		if ((evt->nw_reg_status != LTE_LC_NW_REG_REGISTERED_HOME) &&
 		     (evt->nw_reg_status != LTE_LC_NW_REG_REGISTERED_ROAMING)) {
+			lte_connected = false;
 			break;
 		}
 
@@ -367,7 +450,9 @@ static void lte_handler(const struct lte_lc_evt *const evt)
 			evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME ?
 			"Connected - home network" : "Connected - roaming");
 
-		k_sem_give(&lte_connected);
+		lte_connected = true;
+		k_sem_give(&lte_connected_sem);
+
 		break;
 	case LTE_LC_EVT_PSM_UPDATE:
 		printk("PSM parameter update: TAU: %d, Active time: %d\n",
@@ -383,8 +468,9 @@ static void lte_handler(const struct lte_lc_evt *const evt)
 		if (len > 0) {
 			printk("%s\n", log_buf);
 		}
-		break;
 	}
+
+		break;
 	case LTE_LC_EVT_RRC_UPDATE:
 		printk("RRC mode: %s\n",
 			evt->rrc_mode == LTE_LC_RRC_MODE_CONNECTED ?
@@ -393,55 +479,18 @@ static void lte_handler(const struct lte_lc_evt *const evt)
 	case LTE_LC_EVT_CELL_UPDATE:
 		printk("LTE cell changed: Cell ID: %d, Tracking area: %d\n",
 			evt->cell.id, evt->cell.tac);
-		break;
-	default:
-		break;
-	}
-}
 
-static void modem_configure(void)
-{
-	int err;
-
-	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
-		/* Do nothing, modem is already configured and LTE connected. */
-	} else {
-		err = lte_lc_init_and_connect_async(lte_handler);
-		if (err) {
-			printk("Modem could not be configured, error: %d\n",
-				err);
-			return;
+		if (evt->cell.id == -1 && evt->cell.tac == -1) {
+			lte_connected = false;
 		}
-	}
-}
 
-static void nrf_modem_lib_dfu_handler(void)
-{
-	int err;
-
-	err = modem_lib_init_result;
-
-	switch (err) {
-	case MODEM_DFU_RESULT_OK:
-		printk("Modem update suceeded, reboot\n");
-		sys_reboot(SYS_REBOOT_COLD);
-		break;
-	case MODEM_DFU_RESULT_UUID_ERROR:
-	case MODEM_DFU_RESULT_AUTH_ERROR:
-		printk("Modem update failed, error: %d\n", err);
-		printk("Modem will use old firmware\n");
-		sys_reboot(SYS_REBOOT_COLD);
-		break;
-	case MODEM_DFU_RESULT_HARDWARE_ERROR:
-	case MODEM_DFU_RESULT_INTERNAL_ERROR:
-		printk("Modem update malfunction, error: %d, reboot\n", err);
-		sys_reboot(SYS_REBOOT_COLD);
 		break;
 	default:
+		printk("Unknown event: %d\n", evt->type);
 		break;
 	}
 }
-#endif
+#endif /* CONFIG_NRF_MODEM_LIB */
 
 static int app_topics_subscribe(void)
 {
@@ -449,7 +498,7 @@ static int app_topics_subscribe(void)
 	static char custom_topic[75] = "my-custom-topic/example";
 	static char custom_topic_2[75] = "my-custom-topic/example_2";
 
-	const struct aws_iot_topic_data topics_list[APP_TOPICS_COUNT] = {
+	const struct aws_iot_topic_data topics_list[CONFIG_AWS_IOT_APP_SUBSCRIPTION_LIST_COUNT] = {
 		[0].str = custom_topic,
 		[0].len = strlen(custom_topic),
 		[1].str = custom_topic_2,
@@ -497,15 +546,11 @@ void main(void)
 	printk("The AWS IoT sample started, version: %s\n", CONFIG_APP_VERSION);
 
 	cJSON_Init();
-
-#if defined(CONFIG_NRF_MODEM_LIB)
-	nrf_modem_lib_dfu_handler();
-#endif
+	work_init();
 
 	err = aws_iot_init(NULL, aws_iot_event_handler);
 	if (err) {
-		printk("AWS IoT library could not be initialized, error: %d\n",
-		       err);
+		printk("AWS IoT library could not be initialized, error: %d\n", err);
 	}
 
 	/** Subscribe to customizable non-shadow specific topics
@@ -513,29 +558,9 @@ void main(void)
 	 */
 	err = app_topics_subscribe();
 	if (err) {
-		printk("Adding application specific topics failed, error: %d\n",
-			err);
+		printk("Adding application specific topics failed, error: %d\n", err);
+		return;
 	}
 
-	work_init();
-#if defined(CONFIG_NRF_MODEM_LIB)
-	modem_configure();
-
-	err = modem_info_init();
-	if (err) {
-		printk("Failed initializing modem info module, error: %d\n",
-			err);
-	}
-
-	k_sem_take(&lte_connected, K_FOREVER);
-#endif
-
-	/* Trigger a date time update. The date_time API is used to timestamp data that is sent
-	 * to AWS IoT.
-	 */
-	date_time_update_async(date_time_event_handler);
-
-	/* Postpone connecting to AWS IoT until date time has been obtained. */
-	k_sem_take(&date_time_obtained, K_FOREVER);
-	k_work_schedule(&connect_work, K_NO_WAIT);
+	connect();
 }

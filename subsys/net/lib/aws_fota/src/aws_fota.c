@@ -11,6 +11,7 @@
 #include <net/aws_jobs.h>
 #include <net/aws_fota.h>
 #include <zephyr/logging/log.h>
+#include <dfu/dfu_target.h>
 
 #include "aws_fota_json.h"
 
@@ -348,11 +349,11 @@ static int job_update_accepted(struct mqtt_client *const client,
 		break;
 	case AWS_JOBS_SUCCEEDED: {
 		struct aws_fota_event aws_fota_evt = {
-			.id = AWS_FOTA_EVT_DONE
+			.id = AWS_FOTA_EVT_DONE,
+			.image_type = fota_download_target()
 		};
 
 		LOG_DBG("Job document was updated with status SUCCEEDED");
-		LOG_DBG("Ready to reboot");
 		callback(&aws_fota_evt);
 
 		/* Job is compeleted, reset library. */

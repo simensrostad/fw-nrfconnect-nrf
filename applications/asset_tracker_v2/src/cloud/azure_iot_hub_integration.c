@@ -279,9 +279,14 @@ static void azure_iot_hub_event_handler(struct azure_iot_hub_evt *const evt)
 		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_START;
 		notify = true;
 		break;
-	case AZURE_IOT_HUB_EVT_FOTA_DONE:
-		LOG_DBG("AZURE_IOT_HUB_EVT_FOTA_DONE");
-		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_DONE;
+	case AZURE_IOT_HUB_EVT_FOTA_APPLICATION_DONE:
+		LOG_DBG("AZURE_IOT_HUB_EVT_FOTA_APPLICATION_DONE");
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_APPLICATION_DONE;
+		notify = true;
+		break;
+	case AZURE_IOT_HUB_EVT_FOTA_MODEM_DELTA_DONE:
+		LOG_DBG("AZURE_IOT_HUB_EVT_FOTA_MODEM_DELTA_DONE");
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_MODEM_DELTA_DONE;
 		notify = true;
 		break;
 	case AZURE_IOT_HUB_EVT_FOTA_ERASE_PENDING:

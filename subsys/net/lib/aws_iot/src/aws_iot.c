@@ -198,7 +198,14 @@ static void aws_fota_cb_handler(struct aws_fota_event *fota_evt)
 		break;
 	case AWS_FOTA_EVT_DONE:
 		LOG_DBG("AWS_FOTA_EVT_DONE");
-		aws_iot_evt.type = AWS_IOT_EVT_FOTA_DONE;
+		if (fota_evt->image_type == DFU_TARGET_IMAGE_TYPE_MCUBOOT) {
+			aws_iot_evt.type = AWS_IOT_EVT_FOTA_APPLICATION_DONE;
+		} else if (fota_evt->image_type == DFU_TARGET_IMAGE_TYPE_MODEM_DELTA) {
+			aws_iot_evt.type = AWS_IOT_EVT_FOTA_MODEM_DELTA_DONE;
+		} else {
+			aws_iot_evt.type = AWS_IOT_EVT_ERROR;
+			LOG_ERR("Unknown image type");
+		}
 		break;
 	case AWS_FOTA_EVT_ERASE_PENDING:
 		LOG_DBG("AWS_FOTA_EVT_ERASE_PENDING");

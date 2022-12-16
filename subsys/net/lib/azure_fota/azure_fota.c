@@ -16,6 +16,7 @@
 #include <net/azure_fota.h>
 #include <cJSON.h>
 #include <cJSON_os.h>
+#include <dfu/dfu_target.h>
 
 #include <zephyr/logging/log.h>
 
@@ -236,6 +237,7 @@ static void fota_dl_handler(const struct fota_download_evt *fota_evt)
 		state_set(STATE_INIT);
 		rep_status_set(REP_STATUS_APPLYING);
 		evt.type = AZURE_FOTA_EVT_DONE;
+		evt.image_type = fota_download_target();
 
 		callback_with_report(&evt);
 		break;

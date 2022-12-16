@@ -214,7 +214,7 @@ static void nrf_cloud_event_handler(const struct nrf_cloud_evt *evt)
 		break;
 	case NRF_CLOUD_EVT_FOTA_DONE:
 		LOG_DBG("NRF_CLOUD_EVT_FOTA_DONE");
-		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_DONE;
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_APPLICATION_DONE;
 		notify = true;
 		break;
 	case NRF_CLOUD_EVT_FOTA_ERROR:

@@ -136,7 +136,7 @@ Testing
       [00:01:22.761,657] <inf> STREAM_FLASH: Erasing page at offset 0x000fd000
       [00:01:22.857,238] <inf> dfu_target_mcuboot: MCUBoot image upgrade scheduled. Reset the device to apply
       [2020-08-28 00:38:18] [00:01:15.665,679] <inf> azure_fota: FOTA download completed evt received
-      [2020-08-28 00:38:18] AZURE_IOT_HUB_EVT_FOTA_DONE
+      [2020-08-28 00:38:18] AZURE_IOT_HUB_EVT_FOTA_APPLICATION_DONE
       [2020-08-28 00:38:18] The device will reboot in 5 seconds to apply update
 
 #. When the development kit reboots, observe that the sample displays the logs from the new application.

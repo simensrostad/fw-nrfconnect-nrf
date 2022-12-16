@@ -263,9 +263,14 @@ void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_ERASE_DONE;
 		notify = true;
 		break;
-	case AWS_IOT_EVT_FOTA_DONE:
-		LOG_DBG("AWS_IOT_EVT_FOTA_DONE");
-		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_DONE;
+	case AWS_IOT_EVT_FOTA_APPLICATION_DONE:
+		LOG_DBG("AWS_IOT_EVT_FOTA_APPLICATION_DONE");
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_APPLICATION_DONE;
+		notify = true;
+		break;
+	case AWS_IOT_EVT_FOTA_MODEM_DELTA_DONE:
+		LOG_DBG("AWS_IOT_EVT_FOTA_MODEM_DELTA_DONE");
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_MODEM_DELTA_DONE;
 		notify = true;
 		break;
 	case AWS_IOT_EVT_FOTA_DL_PROGRESS:

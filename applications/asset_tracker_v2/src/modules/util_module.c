@@ -241,7 +241,7 @@ static int setup(const struct device *dev)
 /* Message handler for STATE_INIT. */
 static void on_state_init(struct util_msg_data *msg)
 {
-	if (IS_EVENT(msg, cloud, CLOUD_EVT_FOTA_DONE)) {
+	if (IS_EVENT(msg, cloud, CLOUD_EVT_FOTA_APPLICATION_DONE)) {
 		send_reboot_request(REASON_FOTA_UPDATE);
 	}
 

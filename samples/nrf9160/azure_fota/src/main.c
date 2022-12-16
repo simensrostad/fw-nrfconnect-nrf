@@ -28,9 +28,34 @@ NRF_MODEM_LIB_ON_INIT(azure_fota_init_hook, on_modem_lib_init, NULL);
 /* Initialized to value different than success (0) */
 static int modem_lib_init_result = -1;
 
-static void on_modem_lib_init(int ret, void *ctx)
+static void modem_configure(void);
+
+static void reinit_modem_and_connect(void)
 {
-	modem_lib_init_result = ret;
+	int err;
+
+	(void)azure_iot_hub_disconnect();
+	(void)lte_lc_deinit();
+
+	err = nrf_modem_lib_shutdown();
+	if (err) {
+		printk("Failed shutting down the modem\n");
+		return;
+	}
+
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if (err) {
+		printk("Failed initialzing the modem\n");
+		return;
+	}
+
+	modem_configure();
+
+	err = azure_iot_hub_connect(&config);
+	if (err) {
+		printk("azure_iot_hub_connect failed: %d\n", err);
+		return;
+	}
 }
 
 static void azure_event_handler(struct azure_iot_hub_evt *const evt)
@@ -86,10 +111,15 @@ static void azure_event_handler(struct azure_iot_hub_evt *const evt)
 	case AZURE_IOT_HUB_EVT_FOTA_START:
 		printk("AZURE_IOT_HUB_EVT_FOTA_START\n");
 		break;
-	case AZURE_IOT_HUB_EVT_FOTA_DONE:
-		printk("AZURE_IOT_HUB_EVT_FOTA_DONE\n");
+	case AZURE_IOT_HUB_EVT_FOTA_APPLICATION_DONE:
+		printk("AZURE_IOT_HUB_EVT_FOTA_APPLICATION_DONE\n");
 		printk("The device will reboot in 5 seconds to apply update\n");
 		k_work_schedule(&reboot_work, K_SECONDS(5));
+		break;
+	case AZURE_IOT_HUB_EVT_FOTA_MODEM_DELTA_DONE:
+		printk("AZURE_IOT_HUB_EVT_FOTA_MODEM_DELTA_DONE\n");
+		printk("Modem will be reinitialized to apply update\n");
+		reinit_modem_and_connect();
 		break;
 	case AZURE_IOT_HUB_EVT_FOTA_ERASE_PENDING:
 		printk("AZURE_IOT_HUB_EVT_FOTA_ERASE_PENDING\n");

@@ -40,8 +40,10 @@ static char *get_evt_type_str(enum cloud_module_event_type type)
 		return "CLOUD_EVT_SHUTDOWN_READY";
 	case CLOUD_EVT_FOTA_START:
 		return "CLOUD_EVT_FOTA_START";
-	case CLOUD_EVT_FOTA_DONE:
-		return "CLOUD_EVT_FOTA_DONE";
+	case CLOUD_EVT_FOTA_APPLICATION_DONE:
+		return "CLOUD_EVT_FOTA_APPLICATION_DONE";
+	case CLOUD_EVT_FOTA_MODEM_DELTA_DONE:
+		return "CLOUD_EVT_FOTA_MODEM_DELTA_DONE";
 	case CLOUD_EVT_FOTA_ERROR:
 		return "CLOUD_EVT_FOTA_ERROR";
 	case CLOUD_EVT_ERROR:

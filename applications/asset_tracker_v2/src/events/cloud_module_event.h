@@ -74,7 +74,10 @@ enum cloud_module_event_type {
 	CLOUD_EVT_FOTA_START,
 
 	/** FOTA has been performed, a reboot of the application is needed. */
-	CLOUD_EVT_FOTA_DONE,
+	CLOUD_EVT_FOTA_APPLICATION_DONE,
+
+	/** Modem delta FOTA has been performed, reinitialization of the modem is required. */
+	CLOUD_EVT_FOTA_MODEM_DELTA_DONE,
 
 	/** An error occurred during a FOTA update. */
 	CLOUD_EVT_FOTA_ERROR,

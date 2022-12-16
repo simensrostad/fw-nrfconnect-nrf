@@ -110,10 +110,15 @@ enum azure_iot_hub_evt_type {
 	 */
 	AZURE_IOT_HUB_EVT_FOTA_START,
 
-	/** FOTA update done, reboot required to apply update.
+	/** Application FOTA update done, reboot required to apply update.
 	 *  The event has no associated data.
 	 */
-	AZURE_IOT_HUB_EVT_FOTA_DONE,
+	AZURE_IOT_HUB_EVT_FOTA_APPLICATION_DONE,
+
+	/** Modem delta FOTA update done, reinitialization of the modem is required to apply update.
+	 *  The event has no associated data.
+	 */
+	AZURE_IOT_HUB_EVT_FOTA_MODEM_DELTA_DONE,
 
 	/** FOTA erase pending. On nRF9160-based devices this is typically
 	 *  caused by an active LTE connection preventing erase operation.

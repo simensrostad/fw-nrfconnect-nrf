@@ -295,7 +295,9 @@ static int firmware_update_state_cb(uint8_t update_state)
 		return 0;
 	case STATE_UPDATING:
 		LOG_DBG("STATE_UPDATING, result: %d", update_result);
-		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_DONE;
+		cloud_wrap_evt.type = CLOUD_WRAP_EVT_FOTA_APPLICATION_DONE;
+
+		/* Segregate here on what type of update it is. */
 		break;
 	default:
 		LOG_ERR("Unknown state: %d", update_state);

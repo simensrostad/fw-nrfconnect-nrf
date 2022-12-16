@@ -120,6 +120,7 @@ static struct module_data self = {
 /* Forward declarations. */
 static void connect_check_work_fn(struct k_work *work);
 static void send_config_received(void);
+static void disconnect_cloud(void);
 static void add_qos_message(uint8_t *ptr, size_t len, uint8_t type,
 			    uint32_t flags, bool heap_allocated);
 
@@ -384,9 +385,18 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 		SEND_EVENT(cloud, CLOUD_EVT_LTE_CONNECT);
 		break;
 	}
-	case CLOUD_WRAP_EVT_FOTA_DONE: {
-		LOG_DBG("CLOUD_WRAP_EVT_FOTA_DONE");
-		SEND_EVENT(cloud, CLOUD_EVT_FOTA_DONE);
+	case CLOUD_WRAP_EVT_FOTA_APPLICATION_DONE: {
+		LOG_DBG("CLOUD_WRAP_EVT_FOTA_APPLICATION_DONE");
+		SEND_EVENT(cloud, CLOUD_EVT_FOTA_APPLICATION_DONE);
+		break;
+	}
+	case CLOUD_WRAP_EVT_FOTA_MODEM_DELTA_DONE: {
+		LOG_DBG("CLOUD_WRAP_EVT_FOTA_MODEM_DELTA_DONE");
+
+		/* Disconnect from cloud before the modem is reinitialized */
+		disconnect_cloud();
+
+		SEND_EVENT(cloud, CLOUD_EVT_FOTA_MODEM_DELTA_DONE);
 		break;
 	}
 	case CLOUD_WRAP_EVT_FOTA_START: {

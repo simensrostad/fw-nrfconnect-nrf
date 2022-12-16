@@ -607,7 +607,14 @@ static void fota_evt_handler(struct azure_fota_event *fota_evt)
 		break;
 	case AZURE_FOTA_EVT_DONE:
 		LOG_DBG("AZURE_FOTA_EVT_DONE");
-		evt.type = AZURE_IOT_HUB_EVT_FOTA_DONE;
+		if (fota_evt->image_type == DFU_TARGET_IMAGE_TYPE_MCUBOOT) {
+			evt.type = AZURE_IOT_HUB_EVT_FOTA_APPLICATION_DONE;
+		} else if (fota_evt->image_type == DFU_TARGET_IMAGE_TYPE_MODEM_DELTA) {
+			evt.type = AZURE_IOT_HUB_EVT_FOTA_MODEM_DELTA_DONE;
+		} else {
+			evt.type = AZURE_IOT_HUB_EVT_ERROR;
+			LOG_ERR("Unknown image type");
+		}
 		fota_report_send(fota_evt);
 		azure_iot_hub_notify_event(&evt);
 		break;

@@ -58,10 +58,14 @@ enum cloud_wrap_event_type {
 	CLOUD_WRAP_EVT_LTE_CONNECT_REQUEST,
 	/** Request to disconnect from LTE. */
 	CLOUD_WRAP_EVT_LTE_DISCONNECT_REQUEST,
-	/** Cloud integration layer has successfully performed a FOTA update.
-	 *  Device should now be rebooted.
+	/** Cloud integration layer has successfully performed a FOTA update of the application.
+	 *  Device should now be rebooted for the new firmware image to take effect.
 	 */
-	CLOUD_WRAP_EVT_FOTA_DONE,
+	CLOUD_WRAP_EVT_FOTA_APPLICATION_DONE,
+	/** Cloud integration layer has successfully performed a FOTA update of the modem.
+	 *  The modem should now be reinitialize for the new image to take effect.
+	 */
+	CLOUD_WRAP_EVT_FOTA_MODEM_DELTA_DONE,
 	/** The cloud integration layer has started a FOTA update. */
 	CLOUD_WRAP_EVT_FOTA_START,
 	/** An image erase is pending. */

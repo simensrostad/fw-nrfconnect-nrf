@@ -508,7 +508,8 @@ static void on_state_cloud_associating(struct ui_msg_data *msg)
 /* Message handler for STATE_FOTA_UPDATING. */
 static void on_state_fota_update(struct ui_msg_data *msg)
 {
-	if ((IS_EVENT(msg, cloud, CLOUD_EVT_FOTA_DONE)) ||
+	if ((IS_EVENT(msg, cloud, CLOUD_EVT_FOTA_APPLICATION_DONE)) ||
+	    (IS_EVENT(msg, cloud, CLOUD_EVT_FOTA_MODEM_DELTA_DONE)) ||
 	    (IS_EVENT(msg, cloud, CLOUD_EVT_FOTA_ERROR))) {
 		transition_list_clear();
 		transition_list_append(LED_STATE_TURN_OFF, HOLD_FOREVER);

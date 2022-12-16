@@ -12,6 +12,7 @@
 #include <nrf_modem.h>
 #include <modem/lte_lc.h>
 #include <modem/modem_info.h>
+#include <modem/nrf_modem_lib.h>
 #include <modem/pdn.h>
 
 #define MODULE modem_module
@@ -543,6 +544,8 @@ static int static_modem_data_get(void)
 	modem_module_event->data.modem_static.modem_fw
 		[sizeof(modem_module_event->data.modem_static.modem_fw) - 1] = '\0';
 
+	LOG_WRN("%s", modem_module_event->data.modem_static.modem_fw);
+
 	modem_module_event->data.modem_static.iccid
 		[sizeof(modem_module_event->data.modem_static.iccid) - 1] = '\0';
 
@@ -811,7 +814,51 @@ static int modem_data_init(void)
 	return 0;
 }
 
-static int setup(void)
+static void teardown(void)
+{
+	int err;
+
+	/* Deinitialize Link controller to put modem in offline mode.
+	 * This is a requirement for reinitializing the modem.
+	 */
+	(void)lte_lc_deinit();
+
+	/* Shutdown and initialize the nRF Modem library to perform the update.
+	 * Expect that nrf_modem_lib_init returns MODEM_DFU_RESULT_OK which signifies that DFU
+	 * completed successfully and a reboot (reinitialization) is needed.
+	 */
+	err = nrf_modem_lib_shutdown();
+	if (err) {
+		printk("Failed shutting down the modem\n");
+		return;
+	}
+
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if ((err < 0) || ((err > 0) && (err != MODEM_DFU_RESULT_OK))) {
+		printk("Initializing the modem failed (perform update), error: %d\n", err);
+		return;
+	}
+
+	/* Shutdown and initialize the nRF Modem library again to run the new firmware.
+	 * Expect that nrf_modem_lib_init returns 0 which signifies that the modem has been
+	 * successfully initialized and the new firmware is running.
+	 */
+	err = nrf_modem_lib_shutdown();
+	if (err) {
+		printk("Failed shutting down the modem\n");
+		return;
+	}
+
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if ((err < 0) || ((err > 0) && (err != MODEM_DFU_RESULT_OK))) {
+		printk("Initializing the modem failed (run the new image), error: %d\n", err);
+		return;
+	}
+
+	state_set(STATE_SHUTDOWN);
+}
+
+static int setup()
 {
 	int err;
 
@@ -854,12 +901,10 @@ static int setup(void)
 static void on_state_init(struct modem_msg_data *msg)
 {
 	if (IS_EVENT(msg, modem, MODEM_EVT_CARRIER_INITIALIZED)) {
-		int err;
-
 		state_set(STATE_DISCONNECTED);
 
-		err = setup();
-		__ASSERT(err == 0, "Failed running setup()");
+		__ASSERT(setup() == 0, "Failed running setup()");
+
 		SEND_EVENT(modem, MODEM_EVT_INITIALIZED);
 	}
 }
@@ -1016,9 +1061,21 @@ static void on_all_states(struct modem_msg_data *msg)
 	}
 
 	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
-		lte_lc_power_off();
-		state_set(STATE_SHUTDOWN);
+		teardown();
 		SEND_SHUTDOWN_ACK(modem, MODEM_EVT_SHUTDOWN_READY, self.id);
+	}
+
+	if (IS_EVENT(msg, cloud, CLOUD_EVT_FOTA_MODEM_DELTA_DONE)) {
+		LOG_WRN("CLOUD_EVT_FOTA_MODEM_DELTA_DONE");
+
+		/* Deinitialize the link controller and shutdown the modem. */
+		teardown();
+
+		/* Setup Link controller, PDN, and nRF Modem library. */
+		setup();
+
+		/* Reconnect to LTE. */
+		lte_connect();
 	}
 }
 
@@ -1039,13 +1096,14 @@ static void module_thread_fn(void)
 		state_set(STATE_INIT);
 	} else {
 		state_set(STATE_DISCONNECTED);
-		SEND_EVENT(modem, MODEM_EVT_INITIALIZED);
 
 		err = setup();
 		if (err) {
 			LOG_ERR("Failed setting up the modem, error: %d", err);
 			SEND_ERROR(modem, MODEM_EVT_ERROR, err);
 		}
+
+		SEND_EVENT(modem, MODEM_EVT_INITIALIZED);
 	}
 
 	while (true) {

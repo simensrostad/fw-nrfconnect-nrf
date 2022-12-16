@@ -11,6 +11,8 @@
 #ifndef AZURE_FOTA_H__
 #define AZURE_FOTA_H__
 
+#include <dfu/dfu_target.h>
+
 /**
  * @defgroup azure_fota Azure FOTA library
  * @{
@@ -49,6 +51,15 @@ struct azure_fota_event {
 	char *report;
 	/* Firmware version associated with the event. */
 	char *version;
+	/* Image type, included in AZURE_FOTA_EVT_DONE event.
+	 * Types supported by this library:
+	 *	DFU_TARGET_IMAGE_TYPE_MCUBOOT	  (application image)
+	 *	If this type is set, reboot the application to apply the new image.
+	 *
+	 *	DFU_TARGET_IMAGE_TYPE_MODEM_DELTA (Modem delta image)
+	 *	If this type is set, reinitialize the modem to apply the new image.
+	 */
+	enum dfu_target_image_type image_type;
 };
 
 /**

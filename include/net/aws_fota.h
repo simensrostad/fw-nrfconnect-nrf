@@ -11,6 +11,8 @@
 #ifndef AWS_FOTA_H__
 #define AWS_FOTA_H__
 
+#include <dfu/dfu_target.h>
+
 /**
  * @defgroup aws_fota AWS FOTA library
  * @{
@@ -45,6 +47,7 @@ struct aws_fota_event {
 	enum aws_fota_evt_id id;
 	union {
 		struct aws_fota_event_dl dl;
+		enum dfu_target_image_type image_type;
 	};
 };
 

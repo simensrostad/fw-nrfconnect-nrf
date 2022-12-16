@@ -94,8 +94,14 @@ enum aws_iot_evt_type {
 	AWS_IOT_EVT_PINGRESP,
 	/** FOTA update start. */
 	AWS_IOT_EVT_FOTA_START,
-	/** FOTA update done, request to reboot. */
-	AWS_IOT_EVT_FOTA_DONE,
+	/** Application FOTA update done.
+	 *  Reboot the device to apply the new image.
+	 */
+	AWS_IOT_EVT_FOTA_APPLICATION_DONE,
+	/** Modem delta FOTA update done.
+	 *  Reinitialize the modem in NORMAL mode to apply the new image.
+	 */
+	AWS_IOT_EVT_FOTA_MODEM_DELTA_DONE,
 	/** FOTA erase pending. */
 	AWS_IOT_EVT_FOTA_ERASE_PENDING,
 	/** FOTA erase done. */
