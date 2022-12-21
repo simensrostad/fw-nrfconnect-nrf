@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2022 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig MQTT_SAMPLE_TIMER
+	bool "Timer"
+	default y
+
+if MQTT_SAMPLE_TIMER
+
+endif # MQTT_SAMPLE_TIMER
+
+module = MQTT_SAMPLE_TIMER
+module-str = Timer
+source "subsys/logging/Kconfig.template.log_config"

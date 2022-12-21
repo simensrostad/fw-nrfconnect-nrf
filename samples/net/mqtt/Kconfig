@@ -1,0 +1,22 @@
+#
+# Copyright (c) 2022 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "MQTT sample"
+
+rsource "src/modules/timer/Kconfig.timer"
+rsource "src/modules/sampler/Kconfig.sampler"
+rsource "src/modules/network/Kconfig.network"
+rsource "src/modules/transport/Kconfig.transport"
+
+endmenu
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu
+
+module = MQTT_SAMPLE
+module-str = MQTT sample
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"

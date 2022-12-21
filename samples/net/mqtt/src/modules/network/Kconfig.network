@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2022 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig MQTT_SAMPLE_NETWORK
+	bool "Network"
+	default y
+
+if MQTT_SAMPLE_NETWORK
+
+endif # MQTT_SAMPLE_NETWORK
+
+module = MQTT_SAMPLE_NETWORK
+module-str = Network
+source "subsys/logging/Kconfig.template.log_config"

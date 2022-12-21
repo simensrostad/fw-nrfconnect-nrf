@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2022 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig MQTT_SAMPLE_SAMPLER
+	bool "Sampler"
+	default y
+
+if MQTT_SAMPLE_SAMPLER
+
+endif # MQTT_SAMPLE_SAMPLER
+
+module = MQTT_SAMPLE_SAMPLER
+module-str = Sampler
+source "subsys/logging/Kconfig.template.log_config"

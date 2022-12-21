@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2022 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig MQTT_SAMPLE_TRANSPORT
+	bool "Transport"
+	default y
+
+if MQTT_SAMPLE_TRANSPORT
+
+endif # MQTT_SAMPLE_TRANSPORT
+
+module = MQTT_SAMPLE_TRANSPORT
+module-str = Transport
+source "subsys/logging/Kconfig.template.log_config"
