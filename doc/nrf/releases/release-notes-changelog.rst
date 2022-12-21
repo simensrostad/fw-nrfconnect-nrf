@@ -421,6 +421,11 @@ Wi-Fi samples
 
   * :ref:`wifi_sr_coex_sample` sample demonstrating Wi-Fi Bluetooth LE coexistence.
 
+Networking samples
+------------------
+
+* Added new :ref:`mqtt_sample` sample that supports Wi-Fi and LTE connectivity.
+
 Other samples
 -------------
 

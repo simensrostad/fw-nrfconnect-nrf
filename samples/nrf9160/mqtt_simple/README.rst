@@ -9,6 +9,9 @@ nRF9160: Simple MQTT
 
 The Simple MQTT sample demonstrates how to easily connect an nRF9160 SiP to an MQTT broker and send and receive data.
 
+.. note::
+   This sample has been deprecated. To test MQTT connectivity use the the new :ref:`mqtt_sample` sample.
+
 Requirements
 ************
 
@@ -114,7 +117,7 @@ For example, when building on the command line, you can build the sample with th
 Building and running
 ********************
 
-.. |sample path| replace:: :file:`samples/nrf9160/mqtt_simple`
+.. |sample path| replace:: :file:`samples/net/mqtt`
 
 .. include:: /includes/build_and_run_ns.txt
 

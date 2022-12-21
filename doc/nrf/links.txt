@@ -966,6 +966,9 @@
 .. _`Azure Portal`: https://portal.azure.com/
 
 .. _`Mosquitto`: https://mosquitto.org/
+.. _`mosquitto.org server CA`: https://test.mosquitto.org/ssl/mosquitto.org.crt
+
+.. _`VSMQTT`: https://marketplace.visualstudio.com/items?itemName=rpdswtk.vsmqtt
 
 .. _`Verizon's Thingspace`: https://thingspace.verizon.com
 
