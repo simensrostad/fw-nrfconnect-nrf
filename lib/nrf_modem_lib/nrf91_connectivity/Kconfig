@@ -1,0 +1,42 @@
+# Copyright (c) 2023 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig NRF91_CONNECTIVITY
+	bool "nRF91 L2 Connectivity"
+	# select PDN
+	# select LTE_LINK_CONTROL
+	# default y if (NET_MGMT && NET_SOCKETS_OFFLOAD && NRF_MODEM_LIB)
+	default y
+	help
+	 Some text here
+
+if NRF91_CONNECTIVITY
+
+config NRF91_CONNECTIVITY_THREAD_STACK_SIZE
+	int "nRF91 Connectivity stack size"
+	default 4096
+
+config NRF91_CONNECTIVITY_CONNECT_TIMEOUT_SECONDS
+	int "Connect timeout in seconds"
+	default 600
+	help
+	  Time period in seconds to attempt establishing an LTE link, before timing out.
+
+config NRF91_CONNECTIVITY_CONNECTION_PERSISTENCY
+	bool "Connection persistency"
+	default y
+	help
+	  Persistent connection. If the connection is lost the network will try to reconnect
+	  it self without the need for explicit calls to the network interface.
+
+# define PSM config
+# define edRX config
+# more?
+
+module = NRF91_CONNECTIVITY
+module-str = nRF91 Connectivity
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # NRF91_CONNECTIVITY

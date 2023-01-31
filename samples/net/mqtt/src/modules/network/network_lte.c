@@ -75,26 +75,9 @@ void pdn_event_handler(uint8_t cid, enum pdn_event event, int reason)
 
 static void network_task(void)
 {
-	/* Setup a callback for the default PDP context. */
-	__ASSERT_NO_MSG(pdn_default_ctx_cb_reg(pdn_event_handler) == 0);
 
-	/* Register handler to receive LTE link specific events. */
-	lte_lc_register_handler(lte_event_handler);
-
-	/* Subscribe to modem domain events (AT%MDEV).
-	 * Modem domain events is received in the lte_event_handler().
-	 *
-	 * This function fails for modem firmware versions < 1.3.0 due to not being supported.
-	 * Therefore we ignore its return value.
-	 */
-	(void)lte_lc_modem_events_enable();
-
-	LOG_INF("Connecting to LTE...");
-
-	/* Initialize the link controller and connect to LTE network. */
-	__ASSERT_NO_MSG(lte_lc_init_and_connect() == 0);
 }
 
-K_THREAD_DEFINE(network_task_id,
-		CONFIG_MQTT_SAMPLE_NETWORK_THREAD_STACK_SIZE,
-		network_task, NULL, NULL, NULL, 3, 0, 0);
+K_THREAD_DEFINE(nrf91_connectivity_id,
+		4096,
+		nrf91_connectivity, NULL, NULL, NULL, 3, 0, 0);

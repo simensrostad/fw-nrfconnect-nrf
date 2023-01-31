@@ -168,6 +168,8 @@ static void on_modem_init(int ret, void *ctx)
 	int err;
 	(void) err;
 
+	LOG_WRN("HERE?");
+
 #if defined(CONFIG_PDN_LEGACY_PCO)
 	err = nrf_modem_at_printf("AT%%XEPCO=0");
 	if (err) {
@@ -539,4 +541,4 @@ static int pdn_sys_init(const struct device *unused)
 	return 0;
 }
 
-SYS_INIT(pdn_sys_init, APPLICATION, CONFIG_PDN_INIT_PRIORITY);
+SYS_INIT(pdn_sys_init, PRE_KERNEL_1, CONFIG_PDN_INIT_PRIORITY);
