@@ -1,0 +1,69 @@
+# Copyright (c) 2023 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig NRF91_CONNECTIVITY
+	bool "nRF91 Connectivity"
+	select PDN
+	select PDN_ESM_STRERROR
+	select LTE_LINK_CONTROL
+	depends on NET_SOCKETS_OFFLOAD
+	help
+	 Some text here
+
+if NRF91_CONNECTIVITY
+
+config NRF91_CONNECTIVITY_WORKQUEUE_STACK_SIZE
+	int "Workqueue stack size"
+	default 1024
+	help
+	  Stack size of the internal workqueue.
+
+config NRF91_CONNECTIVITY_NET_IF_NO_AUTO_START
+	bool "Network interface no auto-start"
+	help
+	  Setting this option disables auto starting of the network interface during system boot.
+	  This requires that the interface's administrative state state is manually taken up by
+	  calling net_if_up().
+	  If this option is disabled, the modem is automatically initialized from main context.
+	  Initialization of the modem might take some time, so bear in mind that the main context
+	  will be blocked for that duration.
+
+config NRF91_CONNECTIVITY_NET_IF_NO_AUTO_CONNECT
+	bool "Network interface no auto-connect"
+	help
+	  Setting this option disables auto connecting of the network interface after
+	  going admin up.
+	  If this option is disabled, the interface's operational state must be manually taken up by
+	  calling net_if_connect().
+
+config NRF91_CONNECTIVITY_CONNECT_TIMEOUT_SECONDS
+	int "Connect timeout in seconds"
+	default 600
+	help
+	  Time period in seconds that that the library will try to establish an LTE connection,
+	  before timing out. The connect timeout can be updated by calling
+	  net_if_set_conn_timeout().
+
+config NRF91_CONNECTIVITY_CONNECTION_PERSISTENCY
+	bool "Connection persistency"
+	default y
+	help
+	  Persistent connection. If the connection is lost the modem will try to reconnect
+	  it self without the need for explicit calls to the network interface.
+	  The persistency state can be updated by calling net_if_set_conn_persistence().
+
+# Disable Duplicate Address Detection (DAD) for IPv6 due to not working
+# properly for offloaded interfaces.
+config NET_IPV6_NBR_CACHE
+	default n
+
+config NET_IPV6_MLD
+	default n
+
+module = NRF91_CONNECTIVITY
+module-str = nRF91 Connectivity
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # NRF91_CONNECTIVITY
