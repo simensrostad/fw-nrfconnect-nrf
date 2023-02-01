@@ -539,4 +539,4 @@ static int pdn_sys_init(const struct device *unused)
 	return 0;
 }
 
-SYS_INIT(pdn_sys_init, APPLICATION, CONFIG_PDN_INIT_PRIORITY);
+SYS_INIT(pdn_sys_init, PRE_KERNEL_1, CONFIG_PDN_INIT_PRIORITY);
