@@ -1,0 +1,54 @@
+# Copyright (c) 2023 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig NRF91_CONNECTIVITY
+	bool "nRF91 Connectivity"
+	select PDN
+	select PDN_ESM_STRERROR
+	select LTE_LINK_CONTROL
+	depends on NET_SOCKETS_OFFLOAD
+	help
+	  Library used to provide connectivity for nRF91 based boards via Zephyr network management.
+
+if NRF91_CONNECTIVITY
+
+config NRF91_CONNECTIVITY_WORKQUEUE_STACK_SIZE
+	int "Workqueue stack size"
+	default 1024
+	help
+	  Stack size of the internal workqueue.
+
+config NRF91_CONNECTIVITY_CONNECT_TIMEOUT_SECONDS
+	int "Connect timeout in seconds"
+	default 0
+	help
+	  Time period in seconds that that the library will try to establish an LTE connection,
+	  before timing out. The connect timeout can be updated by calling
+	  conn_mgr_if_set_timeout(). Default value is 0 (timeout disabled).
+	  When the timeout is disabled, the library relies solely on the modem's internal
+	  connection handling to upkeep the connection.
+
+config NRF91_CONNECTIVITY_CONNECTION_PERSISTENCE
+	bool "Connection persistency"
+	default y
+	help
+	  Persistent connection. If the connection is lost the modem will try to reconnect
+	  it self without the need for explicit calls to the network interface.
+	  Persistence can be updated run-time by calling conn_mgr_if_set_flag() with
+	  CONN_MGR_IF_PERSISTENT as flag parameter.
+
+# Disable Duplicate Address Detection (DAD) for IPv6 due to not working
+# properly for offloaded interfaces.
+config NET_IPV6_NBR_CACHE
+	default n
+
+config NET_IPV6_MLD
+	default n
+
+endif # NRF91_CONNECTIVITY
+
+module = NRF91_CONNECTIVITY
+module-str = nRF91 NET L2
+source "subsys/logging/Kconfig.template.log_config"

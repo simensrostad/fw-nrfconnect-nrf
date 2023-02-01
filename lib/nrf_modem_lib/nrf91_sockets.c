@@ -22,12 +22,18 @@
 #include <sockets_internal.h>
 #include <zephyr/sys/fdtable.h>
 #include <zephyr/kernel.h>
+#include <zephyr/net/offloaded_netdev.h>
+#include <zephyr/net/conn_mgr_connectivity.h>
 
 #if defined(CONFIG_POSIX_API)
 #include <zephyr/posix/poll.h>
 #include <zephyr/posix/sys/time.h>
 #include <zephyr/posix/sys/socket.h>
 #endif
+
+#if defined(CONFIG_NRF91_CONNECTIVITY)
+#include "nrf91_connectivity/nrf91_connectivity.h"
+#endif /* CONFIG_NRF91_CONNECTIVITY */
 
 #if defined(CONFIG_NET_SOCKETS_OFFLOAD)
 
@@ -1076,10 +1082,24 @@ static void nrf91_socket_iface_init(struct net_if *iface)
 	iface->if_dev->socket_offload = nrf91_socket_create;
 
 	socket_offload_dns_register(&nrf91_socket_dns_offload_ops);
+
+	net_if_flag_set(iface, NET_IF_NO_AUTO_START);
 }
 
-static struct net_if_api nrf91_if_api = {
-	.init = nrf91_socket_iface_init,
+static int nrf91_iface_enable(const struct net_if *iface, bool enabled)
+{
+#if defined(CONFIG_NRF91_CONNECTIVITY)
+	return enabled ? nrf91_connectivity_enable() : nrf91_connectivity_disable();
+#else
+	ARG_UNUSED(iface);
+	ARG_UNUSED(enabled);
+	return 0;
+#endif /* CONFIG_NRF9160_CONNECTIVITY */
+}
+
+static struct offloaded_if_api nrf91_if_api = {
+	.iface_api.init = nrf91_socket_iface_init,
+	.enable = nrf91_iface_enable,
 };
 
 /* TODO Get the actual MTU for the nRF91 LTE link. */
@@ -1089,4 +1109,18 @@ NET_DEVICE_OFFLOAD_INIT(nrf91_socket, "nrf91_socket",
 			&nrf91_socket_iface_data, NULL,
 			0, &nrf91_if_api, 1280);
 
-#endif
+#if defined(CONFIG_NRF91_CONNECTIVITY)
+/* Bind l2 connectity APIs. */
+static struct conn_mgr_conn_api conn_api = {
+	.init = nrf91_connectivity_init,
+	.connect = nrf91_connectivity_connect,
+	.disconnect = nrf91_connectivity_disconnect,
+	.set_opt = nrf91_connectivity_options_set,
+	.get_opt = nrf91_connectivity_options_get,
+};
+
+CONN_MGR_CONN_DEFINE(NRF91_CONNECTIVITY, &conn_api);
+CONN_MGR_BIND_CONN(nrf91_socket, NRF91_CONNECTIVITY);
+#endif /* CONFIG_NRF91_CONNECTIVITY */
+
+#endif /* CONFIG_NET_SOCKETS_OFFLOAD */
