@@ -35,7 +35,10 @@ void pdn_event_handler(uint8_t cid, enum pdn_event event, int reason);
 /* Structure used to upkeep internal variables. */
 static struct nrf91_connectivity_data {
 	struct net_if_conn if_conn;
-} ctx = { 0 };
+	int net_if_down_action;
+} ctx = {
+	.net_if_down_action = NRF91_CONNECTIVITY_NET_IF_DOWN_LTE_DEACTIVATE
+};
 
 /* Local functions */
 static int modem_init(void)
@@ -81,6 +84,17 @@ static int init(const struct net_if *iface)
 {
 	int ret;
 	static bool first;
+
+	/* Set the default value for the action performed when the network interface is taken down. */
+	if (IS_ENABLED(CONFIG_NRF91_CONNECTIVITY_NET_IF_DOWN_LTE_DEACTIVATE)) {
+		ctx.net_if_down_action = NRF91_CONNECTIVITY_NET_IF_DOWN_LTE_DEACTIVATE;
+	} else if (IS_ENABLED(CONFIG_NRF91_CONNECTIVITY_NET_IF_DOWN_MODEM_SHUTDOWN)) {
+		ctx.net_if_down_action = NRF91_CONNECTIVITY_NET_IF_DOWN_MODEM_SHUTDOWN;
+	} else if (IS_ENABLED(CONFIG_NRF91_CONNECTIVITY_NET_IF_DOWN_MODEM_SHUTDOWN_IF_NO_GNSS)) {
+		ctx.net_if_down_action = NRF91_CONNECTIVITY_NET_IF_DOWN_MODEM_SHUTDOWN_IF_NO_GNSS;
+	} else {
+		__ASSERT(false, "Unsupported NET_IF_DOWN action");
+	}
 
 	/* Set default values for network interface's auto option. */
 	if (IS_ENABLED(CONFIG_NRF91_CONNECTIVITY_NO_AUTO_START)) {
@@ -148,14 +162,32 @@ static int deinit(void)
 	return nrf_modem_lib_shutdown();
 }
 
-static int enable(void)
+static int enable(const struct net_if *iface)
 {
+	switch(ctx.net_if_down_action) {
+	case NRF91_CONNECTIVITY_NET_IF_DOWN_LTE_DEACTIVATE:
+		return lte_lc_func_mode_set(LTE_LC_FUNC_MODE_ACTIVATE_LTE);
+	case NRF91_CONNECTIVITY_NET_IF_DOWN_MODEM_SHUTDOWN:
+		return init(iface);
+	default:
+		__ASSERT(false, "Unsupported action");
+		break;
+	}
 
 	return 0;
 }
 
 static int disable(void)
 {
+	switch(ctx.net_if_down_action) {
+	case NRF91_CONNECTIVITY_NET_IF_DOWN_LTE_DEACTIVATE:
+		return lte_lc_func_mode_set(LTE_LC_FUNC_MODE_DEACTIVATE_LTE);
+	case NRF91_CONNECTIVITY_NET_IF_DOWN_MODEM_SHUTDOWN:
+		return deinit();
+	default:
+		__ASSERT(false, "Unsupported action");
+		break;
+	}
 
 	return 0;
 }
@@ -213,7 +245,7 @@ int nrf91_connectivity_init(const struct net_if *iface)
 
 int nrf91_connectivity_enable(const struct net_if *iface, bool enabled)
 {
-	return enabled ? enable() : disable();
+	return enabled ? enable(iface) : disable();
 }
 
 int nrf91_connectivity_connect(const struct net_if_conn *if_conn)
@@ -228,12 +260,31 @@ int nrf91_connectivity_disconnect(const struct net_if_conn *if_conn)
 	return lte_lc_func_mode_set(LTE_LC_FUNC_MODE_DEACTIVATE_LTE);
 }
 
-int nrf91_connectivity_set_opt(const struct net_if_conn *if_conn)
+int nrf91_connectivity_set_opt(const struct net_if_conn *if_conn,
+			       int optname,
+			       const void *optval,
+			       size_t *optlen)
 {
+	if (!net_if_flag_is_set(if_conn->iface, NET_IF_UP)) {
+		return -ENOTSUP;
+	}
+
+	if (optname == NRF91_CONNECTIVITY_NET_IF_DOWN_ACTION) {
+		__ASSERT()
+		ctx.net_if_down_action = (int)*optval;
+	} else {
+		__ASSERT(false, "Unsupported optname");
+	}
+
+
 	return 0;
 }
 
-int nrf91_connectivity_set_opt(const struct net_if_conn *if_conn)
+int nrf91_connectivity_get_opt(const struct net_if_conn *if_conn,
+			       int optname,
+			       const void *optval,
+			       size_t *optlen)
 {
+	*
 	return 0;
 }

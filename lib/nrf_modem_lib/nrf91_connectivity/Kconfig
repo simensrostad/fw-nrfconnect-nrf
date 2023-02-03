@@ -14,30 +14,11 @@ menuconfig NRF91_CONNECTIVITY
 
 if NRF91_CONNECTIVITY
 
-choice NRF91_CONNECTIVITY_NET_DOWN_ACTION
-	prompt ""
-	default NRF91_CONNECTIVITY_NET_DOWN_LTE_DEACTIVATE
-	help
-
-config NRF91_CONNECTIVITY_NET_DOWN_LTE_DEACTIVATE
-	bool ""
-	help
-
-config NRF91_CONNECTIVITY_NET_DOWN_LTE_DEACTIVATE
-	bool ""
-	help
-
-config NRF91_CONNECTIVITY_NET_DOWN_LTE_DEACTIVATE
-	bool ""
-	help
-
-endchoice # NRF91_CONNECTIVITY_NET_DOWN_ACTION
-
 config NRF91_CONNECTIVITY_NET_IF_NO_AUTO_START
 	bool "Network interface no auto-start"
 	help
 	  Setting this option disables auto starting of the network interface during system boot.
-	  This requires that the interface's administrative state state is manually taken up by
+	  This requires that the interface's administrative state is manually taken up by
 	  calling net_if_up().
 	  If this option is disabled, the modem is automatically initialized from main context.
 	  Initialization of the modem might take some time, so bear in mind that the main context
@@ -47,7 +28,7 @@ config NRF91_CONNECTIVITY_NET_IF_NO_AUTO_CONNECT
 	bool "Network interface no connect"
 	help
 	  Setting this option disables auto connecting of the network interface after
-	  going admin up.
+	  going administrative up.
 	  If this option is disabled, the interface's operational state must be manually taken up by
 	  calling net_if_connect().
 

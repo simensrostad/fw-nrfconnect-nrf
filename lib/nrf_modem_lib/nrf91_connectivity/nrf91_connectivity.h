@@ -14,21 +14,21 @@
 extern "C" {
 #endif
 
-/** Option that specifies which action to take net_if_down() is called.
- *  Handled via net_if_set_conn_opt() and net_if_set_conn_opt().
+/** Option name for setting/getting the action performed when the network interface is brought down.
+ *  Set via the net_if_set_conn_opt() and net_if_get_conn_opt() functions.
  *
- *  Default action action can be set via choice symbol CONFIG_NRF91_CONNECTIVITY_NET_DOWN_ACTION.
- *  This option can only be set when the network interface is up.
+ * Default option is NRF91_CONNECTIVITY_NET_IF_DOWN_LTE_DEACTIVATE.
+ * This option can only be set when the network interface is up.
  */
+#define NRF91_CONNECTIVITY_NET_IF_DOWN_ACTION 1
 
-/** */
-#define NRF91_CONNECTIVITY_NET_DOWN_MODEM_SHUTDOWN 1
+/** Options values for NRF91_CONNECTIVITY_NET_DOWN_ACTION option. */
 
-/** */
-#define NRF91_CONNECTIVITY_NET_DOWN_MODEM_SHUTDOWN_IF_NO_GNSS 2
+/** Deactivate LTE. */
+#define NRF91_CONNECTIVITY_NET_IF_DOWN_LTE_DEACTIVATE 1
 
-/** */
-#define NRF91_CONNECTIVITY_NET_DOWN_LTE_DEACTIVATE 3
+/** Shutdown the modem completely, regardless of whether GNSS is enabled or not. */
+#define NRF91_CONNECTIVITY_NET_IF_DOWN_MODEM_SHUTDOWN 2
 
 /**
  * @brief
@@ -69,6 +69,28 @@ int nrf91_connectivity_connect(const struct net_if_conn *if_conn);
  *  @retval 0 on success.
  */
 int nrf91_connectivity_disconnect(const struct net_if_conn *if_conn);
+
+/** @brief
+ *
+ *  @param
+ *
+ *  @retval 0 on success.
+ */
+int nrf91_connectivity_set_opt(const struct net_if_conn *if_conn,
+			       int optname,
+			       const void *optval,
+			       size_t *optlen);
+
+/** @brief
+ *
+ *  @param
+ *
+ *  @retval 0 on success.
+ */
+int nrf91_connectivity_get_opt(const struct net_if_conn *if_conn,
+			       int optname,
+			       const void *optval,
+			       size_t *optlen);
 
 #ifdef __cplusplus
 }
