@@ -86,6 +86,11 @@ enum pdn_auth {
 typedef void (*pdn_event_handler_t)(uint8_t cid, enum pdn_event event, int reason);
 
 /**
+ * @brief Initialize PDN library.
+ */
+void pdn_init(void);
+
+/**
  * @brief Create a Packet Data Protocol (PDP) context.
  *
  * If a callback is provided via the @p cb parameter, the library will

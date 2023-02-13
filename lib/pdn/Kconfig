@@ -12,6 +12,12 @@ menuconfig PDN
 
 if PDN
 
+config PDN_SYS_INIT
+	bool "Initialize during SYS init"
+	default y
+	help
+	  Initialize the PDN library automatically during the SYS_INIT.
+
 config PDN_LEGACY_PCO
 	bool "Use legacy PCO mode"
 	help

@@ -199,6 +199,23 @@ static void on_modem_init(int ret, void *ctx)
 #endif /* CONFIG_PDN_DEFAULTS_OVERRIDE */
 }
 
+void pdn_init(void)
+{
+	pdn_act_notif.cid = CID_UNASSIGNED;
+
+	k_sem_init(&pdn_act_notif.sem_cgev, 0, 1);
+	k_sem_init(&pdn_act_notif.sem_cnec, 0, 1);
+
+	sys_slist_init(&pdn_contexts);
+
+	/* Do not process notifications until the PDN contexts
+	 * and the semaphores are initialized.
+	 */
+
+	at_monitor_resume(&pdn_cgev);
+	at_monitor_resume(&pdn_cnec_esm);
+}
+
 int pdn_default_ctx_cb_reg(pdn_event_handler_t cb)
 {
 	struct pdn *pdn;
@@ -520,23 +537,14 @@ static void on_cfun(enum lte_lc_func_mode mode, void *ctx)
 }
 #endif /* CONFIG_LTE_LINK_CONTROL */
 
+#if defined(CONFIG_PDN_SYS_INIT)
 static int pdn_sys_init(const struct device *unused)
 {
-	pdn_act_notif.cid = CID_UNASSIGNED;
-
-	k_sem_init(&pdn_act_notif.sem_cgev, 0, 1);
-	k_sem_init(&pdn_act_notif.sem_cnec, 0, 1);
-
-	sys_slist_init(&pdn_contexts);
-
-	/* Do not process notifications until the PDN contexts
-	 * and the semaphores are initialized.
-	 */
-
-	at_monitor_resume(&pdn_cgev);
-	at_monitor_resume(&pdn_cnec_esm);
+	ARG_UNUSED(unused);
+	pdn_init();
 
 	return 0;
 }
 
 SYS_INIT(pdn_sys_init, APPLICATION, CONFIG_PDN_INIT_PRIORITY);
+#endif /* CONFIG_PDN_SYS_INIT */
