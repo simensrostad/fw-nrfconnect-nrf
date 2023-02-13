@@ -362,8 +362,9 @@ static int broker_init(struct sockaddr_storage *broker,
 	struct addrinfo *result;
 	struct addrinfo *addr;
 	struct addrinfo hints = {
-		.ai_family = AF_INET,
-		.ai_socktype = SOCK_STREAM
+		.ai_family = AF_UNSPEC,
+		.ai_socktype = SOCK_STREAM,
+		.ai_protocol = IPPROTO_TCP
 	};
 
 	if (sizeof(CONFIG_MQTT_HELPER_STATIC_IP_ADDRESS) > 1) {
@@ -383,7 +384,24 @@ static int broker_init(struct sockaddr_storage *broker,
 	addr = result;
 
 	while (addr != NULL) {
-		if (addr->ai_addrlen == sizeof(struct sockaddr_in)) {
+		/* Check for IPv6 first and use if available. */
+		if (addr->ai_addrlen == sizeof(struct sockaddr_in6)) {
+			struct sockaddr_in6 *broker6 = ((struct sockaddr_in6 *)broker);
+			char ipv6_addr[INET6_ADDRSTRLEN];
+
+			memcpy(broker6->sin6_addr.s6_addr,
+			       ((struct sockaddr_in6 *)addr->ai_addr)
+			       ->sin6_addr.s6_addr,
+			       sizeof(struct in6_addr));
+			broker6->sin6_family = AF_INET6;
+			broker6->sin6_port = htons(CONFIG_MQTT_HELPER_PORT);
+
+			inet_ntop(AF_INET6, &broker6->sin6_addr.s6_addr,
+				  ipv6_addr, sizeof(ipv6_addr));
+			LOG_DBG("IPv6 Address found %s", ipv6_addr);
+			break;
+		} else if (addr->ai_addrlen == sizeof(struct sockaddr_in)) {
+			/* Next up, IPv4 */
 			struct sockaddr_in *broker4 = ((struct sockaddr_in *)broker);
 			char ipv4_addr[INET_ADDRSTRLEN];
 
@@ -392,18 +410,17 @@ static int broker_init(struct sockaddr_storage *broker,
 			broker4->sin_family = AF_INET;
 			broker4->sin_port = htons(CONFIG_MQTT_HELPER_PORT);
 
-			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
-				  sizeof(ipv4_addr));
+			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
 			LOG_DBG("IPv4 Address found %s", ipv4_addr);
 			break;
 		}
 
-		LOG_DBG("ai_addrlen is %u, while it should be %u",
+		LOG_DBG("ai_addrlen = %u should be %u or %u",
 			(unsigned int)addr->ai_addrlen,
-			(unsigned int)sizeof(struct sockaddr_in));
+			(unsigned int)sizeof(struct sockaddr_in),
+			(unsigned int)sizeof(struct sockaddr_in6));
 
 		addr = addr->ai_next;
-		break;
 	}
 
 	freeaddrinfo(result);
