@@ -390,6 +390,19 @@ Bootloader libraries
 Modem libraries
 ---------------
 
+* :ref:`lte_lc_readme` library:
+
+  * Added:
+
+    * The Kconfig option :kconfig:option:`CONFIG_LTE_PSM_REQ` that automatically requests PSM on modem initialization.
+      If this option is disabled, PSM will not be requested when attaching to the LTE network.
+      Meaning that whatever is stored in the modem's NVS (Non-Volatile Storage) is ignored.
+
+  * Updated:
+
+    * The Kconfig option :kconfig:option:`CONFIG_LTE_EDRX_REQ` will now prevent the modem from requesting eDRX in case the option is disabled.
+      In contrast to the previous behavior, where eDRX was requested even if the option was disabled in the case where the modem has preserved requesting eDRX in its NVS storage.
+
 * :ref:`nrf_modem_lib_readme` library:
 
   * Added the function :c:func:`nrf_modem_lib_fault_strerror` to retrieve a statically allocated textual description of a given modem fault.
