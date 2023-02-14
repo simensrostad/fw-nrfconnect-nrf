@@ -59,6 +59,11 @@ config LTE_UNLOCK_PLMN
 	help
 		Disable PLMN locks for network selection.
 
+config LTE_PSM_REQ
+	bool "Enable requesting use of PSM"
+	help
+		Enable request for use of eDRX using AT+CPSMS.
+
 config LTE_PSM_REQ_RPTAU
 	string "PSM setting requested periodic TAU"
 	default "00000011"
