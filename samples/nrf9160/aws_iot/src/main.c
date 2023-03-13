@@ -495,6 +495,12 @@ void main(void)
 
 	LOG_INF("The AWS IoT sample started, version: %s", CONFIG_APP_VERSION);
 
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if (err) {
+		LOG_ERR("Modem library initialization failed, error: %d", err);
+		return;
+	}
+
 	cJSON_Init();
 
 #if defined(CONFIG_NRF_MODEM_LIB)

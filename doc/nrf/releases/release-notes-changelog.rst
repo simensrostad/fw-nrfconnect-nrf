@@ -312,6 +312,8 @@ Modem libraries
   * Updated:
 
     * The Kconfig option :kconfig:option:`CONFIG_NRF_MODEM_LIB_IPC_PRIO_OVERRIDE` is now deprecated.
+    * The Kconfig option :kconfig:option:`CONFIG_NRF_MODEM_LIB_SYS_INIT` is now deprecated.
+      The application initializes the modem library using the :c:func:`nrf_modem_lib_init` function instead.
 
   * Removed:
 

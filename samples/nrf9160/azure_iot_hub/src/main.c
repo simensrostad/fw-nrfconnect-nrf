@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <modem/nrf_modem_lib.h>
 #include <net/azure_iot_hub.h>
 #include <net/azure_iot_hub_dps.h>
 #include <dk_buttons_and_leds.h>
@@ -542,6 +543,14 @@ void main(void)
 	};
 
 	LOG_INF("Azure IoT Hub sample started");
+
+#if IS_ENABLED(CONFIG_NRF_MODEM_LIB)
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if (err) {
+		LOG_ERR("Modem library initialization failed, error: %d", err);
+		return;
+	}
+#endif
 
 #if IS_ENABLED(CONFIG_DK_LIBRARY)
 	dk_leds_init();

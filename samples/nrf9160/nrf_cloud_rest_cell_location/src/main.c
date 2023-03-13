@@ -418,6 +418,12 @@ int init(void)
 		return err;
 	}
 
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if (err) {
+		printk("Modem library initialization failed, error: %d\n", err);
+		return err;
+	}
+
 	/* Modem info library is used to obtain the modem FW version
 	 * and network info for single-cell requests
 	 */

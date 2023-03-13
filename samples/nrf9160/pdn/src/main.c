@@ -9,6 +9,7 @@
 #include <zephyr/kernel.h>
 #include <modem/pdn.h>
 #include <modem/lte_lc.h>
+#include <modem/nrf_modem_lib.h>
 #include <nrf_modem_at.h>
 
 static const char * const fam_str[] = {
@@ -45,6 +46,12 @@ void main(void)
 	char apn[32];
 
 	printk("PDN sample started\n");
+
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if (err) {
+		printk("Modem library initialization failed, error: %d\n", err);
+		return;
+	}
 
 	/* Setup a callback for the default PDP context (zero).
 	 * Do this before switching to function mode 1 (CFUN=1)

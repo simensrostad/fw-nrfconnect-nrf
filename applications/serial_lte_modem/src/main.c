@@ -55,16 +55,6 @@ static void indicate_wk(struct k_work *work);
 
 BUILD_ASSERT(CONFIG_SLM_WAKEUP_PIN >= 0, "Wake up pin not configured");
 
-NRF_MODEM_LIB_ON_INIT(serial_lte_modem_init_hook, on_modem_lib_init, NULL);
-
-/* Initialized to value different than success (0) */
-static int modem_lib_init_result = -1;
-
-static void on_modem_lib_init(int ret, void *ctx)
-{
-	modem_lib_init_result = ret;
-}
-
 #if defined(CONFIG_NRF_MODEM_LIB_ON_FAULT_APPLICATION_SPECIFIC)
 static void on_modem_failure_shutdown(struct k_work *item);
 static void on_modem_failure_reinit(struct k_work *item);
@@ -262,10 +252,8 @@ void enter_shutdown(void)
 	nrf_regulators_system_off(NRF_REGULATORS_NS);
 }
 
-static void handle_nrf_modem_lib_init_ret(void)
+static void handle_nrf_modem_lib_init_ret(int ret)
 {
-	int ret = modem_lib_init_result;
-
 	/* Handle return values relating to modem firmware update */
 	switch (ret) {
 	case 0:
@@ -397,6 +385,8 @@ static void indicate_wk(struct k_work *work)
 
 int main(void)
 {
+	int err;
+
 	uint32_t rr = nrf_power_resetreas_get(NRF_POWER_NS);
 
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
@@ -411,10 +401,13 @@ int main(void)
 	if (slm_settings_init() != 0) {
 		LOG_WRN("Failed to init slm settings");
 	}
+
+	err = nrf_modem_lib_init(NORMAL_MODE);
+
 	/* Post-FOTA handling */
 	if (fota_stage != FOTA_STAGE_INIT) {
 		if (fota_type == DFU_TARGET_IMAGE_TYPE_MODEM_DELTA) {
-			handle_nrf_modem_lib_init_ret();
+			handle_nrf_modem_lib_init_ret(err);
 		} else if (fota_type == DFU_TARGET_IMAGE_TYPE_MCUBOOT ||
 			   fota_type == SLM_DFU_TARGET_IMAGE_TYPE_BL1) {
 			handle_mcuboot_swap_ret();
@@ -424,6 +417,9 @@ int main(void)
 			fota_info = -EAGAIN;
 		}
 		return start_execute();
+	} else if (err) {
+		LOG_ERR("Modem library init failed, err: %d", err);
+		return err;
 	}
 
 #if defined(CONFIG_SLM_START_SLEEP)

@@ -120,18 +120,6 @@ static struct module_data self = {
 	.supports_shutdown = true,
 };
 
-#if defined(CONFIG_NRF_MODEM_LIB)
-NRF_MODEM_LIB_ON_INIT(asset_tracker_init_hook, on_modem_lib_init, NULL);
-
-/* Initialized to value different than success (0) */
-static int modem_lib_init_result = -1;
-
-static void on_modem_lib_init(int ret, void *ctx)
-{
-	modem_lib_init_result = ret;
-}
-#endif /* CONFIG_NRF_MODEM_LIB */
-
 /* Convenience functions used in internal state handling. */
 static char *state2str(enum state_type new_state)
 {
@@ -191,11 +179,9 @@ static void sub_state_set(enum sub_state_type new_state)
  * the modem is rebooted if a modem firmware update is ready to be applied or
  * an error condition occurred during firmware update or library initialization.
  */
-static void handle_nrf_modem_lib_init_ret(void)
+static void handle_nrf_modem_lib_init_ret(int ret)
 {
 #if defined(CONFIG_NRF_MODEM_LIB)
-	int ret = modem_lib_init_result;
-
 	/* Handle return values relating to modem firmware update */
 	switch (ret) {
 	case 0:
@@ -519,9 +505,12 @@ void main(void)
 	int err;
 	struct app_msg_data msg = { 0 };
 
+#if defined(CONFIG_NRF_MODEM_LIB)
 	if (!IS_ENABLED(CONFIG_LWM2M_CARRIER)) {
-		handle_nrf_modem_lib_init_ret();
+		err = nrf_modem_lib_init(NORMAL_MODE);
+		handle_nrf_modem_lib_init_ret(err);
 	}
+#endif
 
 	if (app_event_manager_init()) {
 		/* Without the Application Event Manager, the application will not work

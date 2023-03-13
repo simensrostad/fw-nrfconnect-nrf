@@ -153,6 +153,12 @@ void main(void)
 
 	printk("HTTPS client sample started\n\r");
 
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if (err) {
+		printk("Modem library initialization failed, error: %d\n", err);
+		return;
+	}
+
 #if !defined(CONFIG_SAMPLE_TFM_MBEDTLS)
 	/* Provision certificates before connecting to the LTE network */
 	err = cert_provision();

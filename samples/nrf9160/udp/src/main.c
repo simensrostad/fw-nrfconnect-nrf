@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <stdio.h>
 #include <modem/lte_lc.h>
+#include <modem/nrf_modem_lib.h>
 #include <zephyr/net/socket.h>
 
 #define UDP_IP_HEADER_SIZE 28
@@ -134,12 +135,18 @@ static void modem_init(void)
 {
 	int err;
 
+	err = nrf_modem_lib_init(NORMAL_MODE);
+	if (err) {
+		printk("Modem library initialization failed, error: %d\n", err);
+		return;
+	}
+
 	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
 		/* Do nothing, modem is already configured and LTE connected. */
 	} else {
 		err = lte_lc_init();
 		if (err) {
-			printk("Modem initialization failed, error: %d\n", err);
+			printk("Modem link initialization failed, error: %d\n", err);
 			return;
 		}
 	}
