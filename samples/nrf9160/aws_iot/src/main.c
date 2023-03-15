@@ -400,15 +400,12 @@ static void modem_configure(void)
 {
 	int err;
 
-	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
-		/* Do nothing, modem is already configured and LTE connected. */
-	} else {
-		err = lte_lc_init_and_connect_async(lte_handler);
-		if (err) {
-			LOG_ERR("Modem could not be configured, error: %d", err);
-			return;
-		}
+	err = lte_lc_init_and_connect_async(lte_handler);
+	if (err) {
+		LOG_ERR("Modem could not be configured, error: %d", err);
+		return;
 	}
+
 }
 
 static void nrf_modem_lib_dfu_handler(void)

@@ -321,6 +321,13 @@ Modem libraries
     * The deprecated function ``nrf_modem_lib_shutdown_wait``.
     * The deprecated Kconfig option ``CONFIG_NRF_MODEM_LIB_TRACE_ENABLED``.
 
+* :ref:`lte_lc_readme` library:
+
+  * Updated:
+
+    * The Kconfig option :kconfig:option:`CONFIG_LTE_AUTO_INIT_AND_CONNECT` is now deprecated.
+      The application calls the :c:func:`lte_lc_init_and_connect` function instead.
+
 Libraries for networking
 ------------------------
 
