@@ -9,9 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <app_event_manager.h>
-#if defined(CONFIG_NRF_MODEM_LIB)
 #include <modem/nrf_modem_lib.h>
-#endif /* CONFIG_NRF_MODEM_LIB */
 #include <zephyr/sys/reboot.h>
 #include <net/nrf_cloud.h>
 
@@ -179,9 +177,10 @@ static void sub_state_set(enum sub_state_type new_state)
  * the modem is rebooted if a modem firmware update is ready to be applied or
  * an error condition occurred during firmware update or library initialization.
  */
-static void handle_nrf_modem_lib_init_ret(int ret)
+static void modem_init(void)
 {
-#if defined(CONFIG_NRF_MODEM_LIB)
+	int ret = nrf_modem_lib_init(NORMAL_MODE);
+
 	/* Handle return values relating to modem firmware update */
 	switch (ret) {
 	case 0:
@@ -217,7 +216,6 @@ static void handle_nrf_modem_lib_init_ret(int ret)
 	LOG_DBG("Rebooting...");
 	LOG_PANIC();
 	sys_reboot(SYS_REBOOT_COLD);
-#endif /* CONFIG_NRF_MODEM_LIB */
 }
 
 /* Application Event Manager handler. Puts event data into messages and adds them to the
@@ -505,12 +503,12 @@ void main(void)
 	int err;
 	struct app_msg_data msg = { 0 };
 
-#if defined(CONFIG_NRF_MODEM_LIB)
+	/* The carrier library will initialize the modem if enabled, if not, we initialize the
+	 * modem in here, before the rest of the application is started.
+	 */
 	if (!IS_ENABLED(CONFIG_LWM2M_CARRIER)) {
-		err = nrf_modem_lib_init(NORMAL_MODE);
-		handle_nrf_modem_lib_init_ret(err);
+		modem_init();
 	}
-#endif
 
 	if (app_event_manager_init()) {
 		/* Without the Application Event Manager, the application will not work
