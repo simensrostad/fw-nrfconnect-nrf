@@ -974,6 +974,60 @@ int nrf_cloud_pvt_data_encode(const struct nrf_cloud_gnss_pvt * const pvt,
 	return 0;
 }
 
+int nrf_cloud_encode_message(const char *app_id, double value, const char *str_val,
+			     const char *topic, int64_t ts, struct nrf_cloud_data *output)
+{
+	int ret = 0;
+
+	__ASSERT_NO_MSG(app_id != NULL);
+	__ASSERT_NO_MSG(output != NULL);
+
+	cJSON *root_obj = cJSON_CreateObject();
+
+	if (root_obj == NULL) {
+		return -ENOMEM;
+	}
+	if (topic != NULL) {
+		ret = json_add_str_cs(root_obj, NRF_CLOUD_REST_TOPIC_KEY, topic);
+	}
+
+	cJSON *msg_obj = cJSON_AddObjectToObjectCS(root_obj, NRF_CLOUD_REST_MSG_KEY);
+
+	if (msg_obj == NULL) {
+		cJSON_Delete(root_obj);
+		return -ENOMEM;
+	}
+
+	ret += json_add_str_cs(msg_obj, NRF_CLOUD_JSON_APPID_KEY, app_id);
+	if (str_val != NULL) {
+		ret += json_add_str_cs(msg_obj, NRF_CLOUD_JSON_DATA_KEY, str_val);
+	} else {
+		ret += json_add_num_cs(msg_obj, NRF_CLOUD_JSON_DATA_KEY, value);
+	}
+	ret += json_add_num_cs(msg_obj, NRF_CLOUD_MSG_TIMESTAMP_KEY, ts);
+	ret += json_add_str_cs(msg_obj, NRF_CLOUD_JSON_MSG_TYPE_KEY,
+			       NRF_CLOUD_JSON_MSG_TYPE_VAL_DATA);
+
+	if (ret != 0) {
+		cJSON_Delete(root_obj);
+		return -ENOMEM;
+	}
+
+	char *buffer;
+
+	buffer = cJSON_PrintUnformatted(root_obj);
+	cJSON_Delete(root_obj);
+
+	if (buffer == NULL) {
+		return -ENOMEM;
+	}
+
+	output->ptr = buffer;
+	output->len = strlen(buffer);
+
+	return 0;
+}
+
 static int nrf_cloud_encode_service_info_fota(const struct nrf_cloud_svc_info_fota *const fota,
 					      cJSON *const svc_inf_obj)
 {
