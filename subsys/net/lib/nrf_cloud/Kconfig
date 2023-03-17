@@ -23,6 +23,8 @@ rsource "Kconfig.nrf_cloud_alert"
 
 rsource "Kconfig.nrf_cloud_log"
 
+rsource "Kconfig.nrf_cloud_coap"
+
 config NRF_CLOUD_GATEWAY
 	bool "nRF Cloud Gateway"
 	help
