@@ -22,10 +22,11 @@ Overview
 *********
 
 The sample connects to either LTE or Wi-Fi, depending on the board for which the sample is compiled.
-Subsequently, the sample connects to a configured MQTT server (default is `test.mosquitto.org`_), where it publishes messages to the topic ``my/publish/topic``.
+Subsequently, the sample connects to a configured MQTT server (default is `test.mosquitto.org`_), where it publishes messages to the topic ``[<prefix>/]my/publish/topic``.
 You can also trigger message publication by pressing any of the buttons on the board.
 
-The sample also subscribes to the topic ``my/subscribe/topic``, and receives any message published to that topic.
+The sample also subscribes to the topic ``[<prefix>/]my/subscribe/topic``, and receives any message published to that topic.
+
 The sample supports Transport Layer Security (TLS) and it can be enabled through overlay configuration files included in the sample.
 
 .. note::
