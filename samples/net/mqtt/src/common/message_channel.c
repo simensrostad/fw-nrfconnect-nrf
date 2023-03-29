@@ -22,7 +22,7 @@ ZBUS_CHAN_DEFINE(PAYLOAD_CHAN,
 		 struct payload,
 		 NULL,
 		 NULL,
-		 ZBUS_OBSERVERS(transport),
+		 ZBUS_OBSERVERS(transport IF_ENABLED(CONFIG_MQTT_SAMPLE_ENCODER, (, encoder))),
 		 ZBUS_MSG_INIT(0)
 );
 

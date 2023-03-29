@@ -26,8 +26,36 @@ extern "C" {
 		IF_ENABLED(CONFIG_REBOOT, (sys_reboot(0)));					\
 	}
 
+enum serialization_format {
+	JSON,
+	PROTOBUF,
+	CBOR
+};
+
+struct raw {
+	uint32_t id;
+	char type[8];
+	char name[8];
+	uint32_t uptime;
+};
+
+struct encoded {
+	/* Total size of buffer that contains encoded data. */
+	uint8_t buffer[CONFIG_MQTT_SAMPLE_PAYLOAD_CHANNEL_BUFFER_MAX_SIZE];
+
+	/* Length of valid encoded data. */
+	size_t length;
+
+	/* Format of encoded data. */
+	enum serialization_format format;
+};
+
 struct payload {
-	char string[CONFIG_MQTT_SAMPLE_PAYLOAD_CHANNEL_STRING_MAX_SIZE];
+	/* Raw data, contains samplet parameters. */
+	struct raw raw;
+
+	/* Encoded data, contains encoded buffer and serialization format. */
+	struct encoded encoded;
 };
 
 enum network_status {

@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+message Message {
+    uint32 id = 1;
+    string type = 2;
+    string name = 3;
+    uint32 uptime = 4;
+}

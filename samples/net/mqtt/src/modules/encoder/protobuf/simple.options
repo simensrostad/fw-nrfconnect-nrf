@@ -1,0 +1,2 @@
+Message.type max_size:8 fixed_length:true
+Message.name max_size:8 fixed_length:true

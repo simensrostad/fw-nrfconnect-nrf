@@ -6,9 +6,13 @@
 
 menu "Sampler"
 
+# Enable Modem information library
+config MODEM_INFO
+	default y
+
 config MQTT_SAMPLE_SAMPLER_THREAD_STACK_SIZE
 	int "Thread stack size"
-	default 1024
+	default 2048
 
 config MQTT_SAMPLE_SAMPLER_MESSAGE_QUEUE_SIZE
 	int "Message queue size"

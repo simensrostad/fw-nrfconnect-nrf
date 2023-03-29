@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2023 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig MQTT_SAMPLE_ENCODER
+	bool "Encoder"
+	select CJSON_LIB
+	select NANOPB
+	select ZCBOR
+	default y
+
+if MQTT_SAMPLE_ENCODER
+
+choice MQTT_SAMPLE_ENCODER_FORMAT_JSON
+	prompt "Serialization format"
+	default MQTT_SAMPLE_ENCODER_FORMAT_JSON
+
+config MQTT_SAMPLE_ENCODER_FORMAT_JSON
+	bool "JSON"
+
+config MQTT_SAMPLE_ENCODER_FORMAT_PROTOBUF
+	bool "Protobuf"
+
+config MQTT_SAMPLE_ENCODER_FORMAT_CBOR
+	bool "CBOR"
+
+endchoice
+
+module = MQTT_SAMPLE_ENCODER
+module-str = Encoder
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # MQTT_SAMPLE_ENCODER

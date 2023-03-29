@@ -10,8 +10,6 @@
 
 #include "message_channel.h"
 
-#define FORMAT_STRING "Hello MQTT! Current uptime is: %d"
-
 /* Register log module */
 LOG_MODULE_REGISTER(sampler, CONFIG_MQTT_SAMPLE_SAMPLER_LOG_LEVEL);
 
@@ -20,20 +18,13 @@ ZBUS_SUBSCRIBER_DEFINE(sampler, CONFIG_MQTT_SAMPLE_SAMPLER_MESSAGE_QUEUE_SIZE);
 
 static void sample(void)
 {
-	struct payload payload = { 0 };
-	uint32_t uptime = k_uptime_get_32();
-	int err, len;
-
-	/* The payload is user defined and can be sampled from any source.
-	 * Default case is to populate a string and send it on the payload channel.
-	 */
-
-	len = snprintk(payload.string, sizeof(payload.string), FORMAT_STRING, uptime);
-	if ((len < 0) || (len >= sizeof(payload))) {
-		LOG_ERR("Failed to construct message, error: %d", len);
-		SEND_FATAL_ERROR();
-		return;
-	}
+	int err;
+	struct payload payload = {
+		.raw.id = 24,
+		.raw.type = "Dog",
+		.raw.name = "Charlie",
+		.raw.uptime = k_uptime_get_32()
+	};
 
 	err = zbus_chan_pub(&PAYLOAD_CHAN, &payload, K_SECONDS(1));
 	if (err) {

@@ -105,8 +105,8 @@ static void publish(struct payload *payload)
 {
 	int err;
 	struct mqtt_publish_param param = {
-		.message.payload.data = payload->string,
-		.message.payload.len = strlen(payload->string),
+		.message.payload.data = payload->encoded.buffer,
+		.message.payload.len = payload->encoded.length,
 		.message.topic.qos = MQTT_QOS_1_AT_LEAST_ONCE,
 		.message_id = k_uptime_get_32(),
 		.message.topic.topic.utf8 = CONFIG_MQTT_SAMPLE_TRANSPORT_PUBLISH_TOPIC,
@@ -119,10 +119,18 @@ static void publish(struct payload *payload)
 		return;
 	}
 
-	LOG_INF("Published message: \"%.*s\" on topic: \"%.*s\"", param.message.payload.len,
-								  param.message.payload.data,
-								  param.message.topic.topic.size,
-								  param.message.topic.topic.utf8);
+	if (payload->encoded.format == JSON) {
+		LOG_INF("Published message: \"%.*s\"", param.message.payload.len,
+						       param.message.payload.data);
+	} else {
+		LOG_INF("Published message:");
+
+		for(int i = 0; i < param.message.payload.len; i++) {
+			LOG_INF("0x%02x ", param.message.payload.data[i]);
+		}
+	}
+
+	LOG_INF("On topic: %.*s", param.message.topic.topic.size, param.message.topic.topic.utf8);
 }
 
 static void subscribe(void)
