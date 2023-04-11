@@ -8,7 +8,7 @@ menu "Trigger"
 
 config MQTT_SAMPLE_TRIGGER_THREAD_STACK_SIZE
 	int "Thread stack size"
-	default 512
+	default 8192
 
 config MQTT_SAMPLE_TRIGGER_TIMEOUT_SECONDS
 	int "Trigger timer timeout"

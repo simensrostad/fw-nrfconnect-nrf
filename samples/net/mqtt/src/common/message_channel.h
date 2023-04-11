@@ -27,9 +27,9 @@ extern "C" {
 	}
 
 enum serialization_format {
+	NONE,
 	JSON,
 	PROTOBUF,
-	CBOR
 };
 
 struct raw {

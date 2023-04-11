@@ -6,9 +6,8 @@
 
 menuconfig MQTT_SAMPLE_ENCODER
 	bool "Encoder"
-	select CJSON_LIB
+	select JSON_LIBRARY
 	select NANOPB
-	select ZCBOR
 	default y
 
 if MQTT_SAMPLE_ENCODER
