@@ -126,6 +126,20 @@ void net_l2_wifi_init(struct conn_mgr_conn_binding *const binding)
 			   K_THREAD_STACK_SIZEOF(l2_wifi_wq_stack_area),
 			   0,
 			   NULL);
+
+	int ret = conn_mgr_if_set_flag(binding->iface, CONN_MGR_IF_NO_AUTO_CONNECT, true);
+	if (ret) {
+		LOG_ERR("conn_mgr_if_set_flag, error: %d", ret);
+		net_mgmt_event_notify(NET_EVENT_CONN_IF_FATAL_ERROR, binding->iface);
+		return;
+	}
+
+	ret = conn_mgr_if_set_flag(binding->iface, CONN_MGR_IF_NO_AUTO_DOWN, true);
+	if (ret) {
+		LOG_ERR("conn_mgr_if_set_flag, error: %d", ret);
+		net_mgmt_event_notify(NET_EVENT_CONN_IF_FATAL_ERROR, binding->iface);
+		return;
+	}
 }
 
 static struct conn_mgr_conn_api l2_wifi_conn_api = {

@@ -341,6 +341,7 @@ void wifi_nrf_if_init_zep(struct net_if *iface)
 			     NET_EVENT_IPV6_MADDR_ADD | NET_EVENT_IPV6_MADDR_DEL);
 	net_mgmt_add_event_callback(&ip_maddr6_cb);
 
+	net_if_flag_set(iface, NET_IF_NO_AUTO_START);
 }
 
 
