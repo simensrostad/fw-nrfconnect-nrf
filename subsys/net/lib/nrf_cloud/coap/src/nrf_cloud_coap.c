@@ -26,6 +26,25 @@ LOG_MODULE_REGISTER(nrf_cloud_coap, CONFIG_NRF_CLOUD_COAP_LOG_LEVEL);
 #define MAX_COAP_PAYLOAD_SIZE (CONFIG_COAP_CLIENT_BLOCK_SIZE - \
 			       CONFIG_COAP_CLIENT_MESSAGE_HEADER_SIZE)
 
+/* Mapping of enum to strings for Job Execution Status. */
+static const char *const job_status_strings[] = {
+	[NRF_CLOUD_FOTA_QUEUED]      = "QUEUED",
+	[NRF_CLOUD_FOTA_IN_PROGRESS] = "IN_PROGRESS",
+	[NRF_CLOUD_FOTA_FAILED]      = "FAILED",
+	[NRF_CLOUD_FOTA_SUCCEEDED]   = "SUCCEEDED",
+	[NRF_CLOUD_FOTA_TIMED_OUT]   = "TIMED_OUT",
+	[NRF_CLOUD_FOTA_REJECTED]    = "REJECTED",
+	[NRF_CLOUD_FOTA_CANCELED]    = "CANCELLED",
+	[NRF_CLOUD_FOTA_DOWNLOADING] = "DOWNLOADING",
+};
+
+#define JOB_STATUS_STRING_COUNT (sizeof(job_status_strings) / \
+				 sizeof(*job_status_strings))
+#define API_FOTA_JOB_EXEC		"fota/exec"
+#define API_UPDATE_FOTA_URL_TEMPLATE	(API_FOTA_JOB_EXEC "/%s")
+#define API_UPDATE_FOTA_BODY_TEMPLATE	"{\"status\":\"%s\"}"
+#define API_UPDATE_FOTA_DETAILS_TMPLT	"{\"status\":\"%s\", \"details\":\"%s\"}"
+
 /* Buffer to encode requests into */
 static uint8_t buffer[500];
 
@@ -391,7 +410,7 @@ int nrf_cloud_coap_shadow_state_update(const char * const shadow_json)
 
 	return nrf_cloud_coap_patch("state", NULL, (uint8_t *)shadow_json,
 				    strlen(shadow_json),
-				    COAP_CONTENT_FORMAT_APP_JSON, true, NULL, NULL);
+				    COAP_CONTENT_FORMAT_APP_JSON, false, NULL, NULL);
 }
 
 int nrf_cloud_coap_shadow_device_status_update(const struct nrf_cloud_device_status

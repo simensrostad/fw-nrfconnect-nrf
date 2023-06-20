@@ -200,7 +200,7 @@ static void auth_cb(int16_t result_code, size_t offset, const uint8_t *payload, 
 
 static int nrf_cloud_coap_authorize(void)
 {
-	int err;
+	int err = 0;
 	char *jwt;
 
 	if (authorized) {

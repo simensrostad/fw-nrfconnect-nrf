@@ -49,10 +49,10 @@ static void trigger_task(void)
 	}
 #endif /* CONFIG_DK_LIBRARY */
 
-	while (true) {
-		message_send();
-		k_sleep(K_SECONDS(CONFIG_MQTT_SAMPLE_TRIGGER_TIMEOUT_SECONDS));
-	}
+	// while (true) {
+	// 	message_send();
+	// 	k_sleep(K_SECONDS(CONFIG_MQTT_SAMPLE_TRIGGER_TIMEOUT_SECONDS));
+	// }
 }
 
 K_THREAD_DEFINE(trigger_task_id,

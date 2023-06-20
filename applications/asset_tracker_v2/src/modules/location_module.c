@@ -498,6 +498,12 @@ void location_event_handler(const struct location_event_data *event_data)
 	}
 }
 
+	err = location_init(location_event_handler);
+	if (err) {
+		LOG_ERR("Initializing the Location library failed, error: %d", err);
+		return -1;
+	}
+
 static bool location_data_requested(enum app_module_data_type *data_list, size_t count)
 {
 	for (size_t i = 0; i < count; i++) {

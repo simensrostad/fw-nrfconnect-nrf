@@ -181,10 +181,8 @@ struct location_data_error {
 
 /** Cloud location information. */
 struct location_data_cloud {
-#if defined(CONFIG_LOCATION_SERVICE_EXTERNAL) && defined(CONFIG_LOCATION_METHOD_CELLULAR)
 	/** Cellular cell information. */
 	const struct lte_lc_cells_info *cell_data;
-#endif
 #if defined(CONFIG_LOCATION_SERVICE_EXTERNAL) && defined(CONFIG_LOCATION_METHOD_WIFI)
 	/** Wi-Fi access point information. */
 	const struct wifi_scan_info *wifi_data;
@@ -231,15 +229,12 @@ struct location_event_data {
 		 */
 		struct gps_pgps_request pgps_request;
 #endif
-#if defined(CONFIG_LOCATION_SERVICE_EXTERNAL) &&\
-	(defined(CONFIG_LOCATION_METHOD_CELLULAR) || defined(CONFIG_LOCATION_METHOD_WIFI))
 		/**
 		 * Cloud location information to let the application know it should send these
 		 * to a cloud service to resolve the location.
 		 * Used with event LOCATION_EVT_CLOUD_LOCATION_EXT_REQUEST.
 		 */
 		struct location_data_cloud cloud_location_request;
-#endif
 	};
 };
 

@@ -11,6 +11,8 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log_ctrl.h>
 
+#include <modem/lte_lc.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -26,8 +28,17 @@ extern "C" {
 		IF_ENABLED(CONFIG_REBOOT, (sys_reboot(0)));					\
 	}
 
+
+struct network_location {
+	/** Current cell */
+	struct lte_lc_cells_info cell_current;
+	/** Neighbors */
+	struct lte_lc_ncell cell_neighbors[CONFIG_LTE_NEIGHBOR_CELLS_MAX];
+};
+
 struct payload {
 	char string[CONFIG_MQTT_SAMPLE_PAYLOAD_CHANNEL_STRING_MAX_SIZE];
+	struct network_location network_location;
 };
 
 enum network_status {

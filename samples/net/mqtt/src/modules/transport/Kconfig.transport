@@ -5,7 +5,6 @@
 #
 
 menu "Transport"
-	depends on MQTT_HELPER
 	depends on HW_ID_LIBRARY
 
 config MQTT_SAMPLE_TRANSPORT_RECONNECTION_TIMEOUT_SECONDS
@@ -16,7 +15,7 @@ config MQTT_SAMPLE_TRANSPORT_RECONNECTION_TIMEOUT_SECONDS
 
 config MQTT_SAMPLE_TRANSPORT_THREAD_STACK_SIZE
 	int "Thread stack size"
-	default 2048
+	default 8192
 
 config MQTT_SAMPLE_TRANSPORT_MESSAGE_QUEUE_SIZE
 	int "Message queue size"
