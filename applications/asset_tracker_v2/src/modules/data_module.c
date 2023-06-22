@@ -271,6 +271,29 @@ static bool grant_send(enum coneval_supported_data_type type,
 		       struct lte_lc_conn_eval_params *coneval,
 		       bool override)
 {
+
+	/* This function is called everytime the application has sampled data.
+	 * To postpone sending of data, this function simply needs to return false.
+	 * To grant send, the function needs to return true.
+	 *
+	 * ATM, the function sends the data if the sensor buffer is full, but can be refactored
+	 * to trigger on other buffers as well.
+	 *
+	 * Note that there might be a mismatch between the sizes of the different buffers, so it
+	 * might be that when the sensor buffer is filled, other buffers might not be.
+	 *
+	 * Due to the head of the sensor buffer being reset to 0 before this check we grant send
+	 * when the head of the buffer is the ARRAY size of the buffer - 1.
+	 */
+	if (head_sensor_buf == ARRAY_SIZE(sensors_buf) - 1) {
+		LOG_INF("Sensor buffer is full, Send granted");
+		return true;
+	} else {
+		/* Postpone sending of data data */
+		LOG_INF("Sensor buffer is not full, Send NOT granted");
+		return false;
+	}
+
 #if defined(CONFIG_DATA_GRANT_SEND_ON_CONNECTION_QUALITY)
 	/* List used to keep track of how many times a data type has been denied a send.
 	 * Indexed by coneval_supported_data_type.
