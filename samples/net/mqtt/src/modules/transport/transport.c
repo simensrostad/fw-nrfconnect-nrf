@@ -69,7 +69,7 @@ static struct s_object {
  */
 static void on_mqtt_connack(enum mqtt_conn_return_code return_code)
 {
-	ARG_UNUSED(return_code);
+	ARG_UNUSED(return_code);awdawdawd
 
 	smf_set_state(SMF_CTX(&s_obj), &state[MQTT_CONNECTED]);
 }
