@@ -38,6 +38,7 @@ target_include_directories(app PRIVATE
 )
 
 target_sources(app PRIVATE
+    src/shell_commands.c
     src/app_task.cpp
     src/main.cpp
     src/zcl_callbacks.cpp
@@ -62,4 +63,9 @@ chip_configure_data_model(app
     GEN_DIR src/zap-generated
     ZAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/light_bulb.zap
 )
+
+zephyr_include_directories_ifdef(CONFIG_SHELL_BACKEND_MQTT_PROVISION_CERTIFICATES certs)
+
+target_compile_options(app PRIVATE "-flto")
+
 # NORDIC SDK APP END
