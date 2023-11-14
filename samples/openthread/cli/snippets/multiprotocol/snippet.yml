@@ -1,3 +1,0 @@
-name: multiprotocol
-append:
-  EXTRA_CONF_FILE: multiprotocol.conf
