@@ -1,0 +1,7 @@
+tests:
+  asset_tracker_v2.application_module_test.tester:
+    platform_allow: native_posix nrf9160dk_nrf9160_ns
+    integration_platforms:
+      - native_posix
+      - nrf9160dk_nrf9160_ns
+    tags: application_module
