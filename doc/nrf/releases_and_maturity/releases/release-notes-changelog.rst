@@ -894,6 +894,14 @@ Other libraries
   * Added more default LTE metrics, such as band, operator, RSRP, and kilobytes sent and received.
   * Updated the default metric names to follow the standard |NCS| variable name convention.
 
+* :ref:`lib_wifi_credentials` library:
+
+  * Updated PSA backend to use PSA Internal Trusted Storage to store Wi-Fi credentials instead of Protected Storage.
+    This was changed because PSA Internal Trusted Storage is better suited to store secrets.
+    When switching storage the credentials will need to be migrated manually, or the existing credentials will be lost.
+    Removed :kconfig:option:`CONFIG_WIFI_CREDENTIALS_BACKEND_PSA_UID_OFFSET`.
+    Use :kconfig:option:`CONFIG_WIFI_CREDENTIALS_BACKEND_PSA_OFFSET` instead.
+
 Common Application Framework (CAF)
 ----------------------------------
 
