@@ -12,6 +12,17 @@ Required changes
 
 The following changes are mandatory to make your application work in the same way as in previous releases.
 
+* For applications using the :ref:`lib_mqtt_helper` library:
+
+  * The ``CONFIG_MQTT_HELPER_CERTIFICATES_FILE`` is now replaced by :kconfig:option:`CONFIG_MQTT_HELPER_CERTIFICATES_FOLDER`.
+    The new option is a folder path where the certificates are stored.
+    The folder path must be relative to the root of the project.
+
+    If you are using the :ref:`lib_mqtt_helper` library, you must update the Kconfig option to use the new option.
+
+  * When using the :kconfig:option:`CONFIG_MQTT_HELPER_PROVISION_CERTIFICATES` Kconfig option, the certificate files must be in standard PEM format.
+    This means that the PEM files must not be converted to string format anymore.
+
 * For the Serial LTE Modem (SLM) application:
 
   * The Zephyr settings backend has been changed from :ref:`FCB <fcb_api>` to :ref:`NVS <nvs_api>`.

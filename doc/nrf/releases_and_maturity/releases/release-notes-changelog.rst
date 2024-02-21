@@ -714,8 +714,11 @@ Networking samples
   * A new sample :ref:`http_server`.
   * Support for the nRF9151 development kit.
 
-* Updated the networking samples to build using the non-secure target when building for the nRF7002DK.
-  The :kconfig:option:`CONFIG_TFM_PROFILE_TYPE_SMALL` profile type is used for Trusted Firmware-M (TF-M) to optimize its memory footprint.
+* Updated:
+
+  *  The networking samples to support import of certificates in valid PEM formats.
+  *  The networking samples to build using the non-secure target when building for the nRF7002 DK.
+     The :kconfig:option:`CONFIG_TFM_PROFILE_TYPE_SMALL` profile type is used for Trusted Firmware-M (TF-M) to optimize its memory footprint.
 
 * :ref:`net_coap_client_sample` sample:
 
@@ -1167,6 +1170,8 @@ Libraries for networking
 * :ref:`lib_mqtt_helper` library:
 
   * Added support for using a password when connecting to a broker.
+  * Changed the library to read certificates as standard PEM format. Previously the certificates had to be manually converted to string format before compiling the application.
+  * Replaced the ``CONFIG_MQTT_HELPER_CERTIFICATES_FILE`` Kconfig option with :kconfig:option:`CONFIG_MQTT_HELPER_CERTIFICATES_FOLDER`. The new option specifies the folder where the certificates are stored.
 
 * :ref:`lib_lwm2m_client_utils` library:
 
