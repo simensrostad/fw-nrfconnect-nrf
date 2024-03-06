@@ -125,17 +125,13 @@ To generate new credentials, run the following commands:
 
       .. code-block:: console
 
-         # Generate a new RSA key pair (private key and public key) and create a self-signed X.509 certificate for a server.
-         openssl req -newkey rsa:2048 -nodes -keyout server_private_key.pem -x509 -days 365 -out server_certificate.pem
+         # Generate a self-signed CA certificate using ecdsa-with-SHA256 as the signature algorithm.
+         cert_tool.py root_ca \
+            --common-name httpserver.local \
+            --root-cert credentials/server_certificate.pem \
+            --root-key credentials/server_private_key.pem
 
-         # Generate a new RSA private key for a client.
-         openssl genpkey -algorithm RSA -out client.key
-
-         # Create a Certificate Signing Request (CSR) for the client using the generated private key.
-         openssl req -new -key client.key -out client.csr
-
-         # Sign the client's CSR with the server's private key and certificate, creating a client certificate.
-         openssl x509 -req -in client.csr -CA server_certificate.pem -CAkey server_private_key.pem -CAcreateserial -out client.crt -days 365
+         # TODO - Add steps on how to generate client certificate using the cert tool
 
 To provision the generated credentials to the server's TLS stack, replace the pregenerated certificates with the newly generated one in the :file:`http_server/credentials` folder in PEM format.
 Provisioning happens automatically after the firmware boots by the sample.
