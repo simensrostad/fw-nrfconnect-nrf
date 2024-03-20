@@ -1,0 +1,107 @@
+#
+# Copyright (c) 2024 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig WIFI_PROVISION
+	bool "Wifi provision"
+	depends on NANOPB
+	depends on NRF700X_AP_MODE
+	depends on WPA_SUPP_AP
+	depends on SMF
+	depends on NET_DHCPV4_SERVER
+	depends on TLS_CREDENTIALS
+	depends on WIFI_CREDENTIALS
+	depends on HTTP_PARSER
+	depends on HTTP_PARSER_URL
+	depends on NET_SOCKETS_SOCKOPT_TLS
+	depends on !NET_CONFIG_AUTO_INIT
+	depends on !NET_CONFIG_SETTINGS
+
+if WIFI_PROVISION
+
+config WIFI_PROVISION_SERVER_CERTIFICATE_REGISTER
+	bool "Register server certificate"
+	default y
+	help
+	  If this option is enabled, a self-signed server certificate
+	  will be registered to TLS credentials storage when provisioning starts.
+
+config WIFI_PROVISION_SERVER_CERTIFICATES_FOLDER
+	string "Server certificate folder"
+	depends on WIFI_PROVISION_SERVER_CERTIFICATE_REGISTER
+	default "certs"
+	help
+	  The default path for the folder that contains the server certificate,
+	  relative to the application source directory.
+	  By default, the library expects the credentials to be in
+	  Privacy Enhanced Mail (PEM) format.
+
+config WIFI_PROVISION_RESPONSE_BUFFER_SIZE
+	int "Response buffer size"
+	default 512
+
+config WIFI_PROVISION_TCP_RECV_BUF_SIZE
+	int "TCP receive buffer size"
+	default 256
+
+config WIFI_PROVISION_SCAN_RESULT_BUFFER_SIZE
+	int "Scan result buffer size"
+	default 512
+
+config WIFI_PROVISION_THREAD_STACK_SIZE
+	int "Thread stack size"
+	default 4096
+
+config WIFI_PROVISION_URL_MAX_SIZE
+	int "URL max size"
+	default 32
+
+config WIFI_PROVISION_BODY_MAX_SIZE
+	int "Body max size"
+	default 256
+
+config WIFI_PROVISION_SSID_SUFFIX
+	string "SSID suffix"
+	default "-nrf-wifiprov"
+	help
+	  Suffix appended to the last 3 hex values of the device's MAC address
+	  to form the advertised SSID in softAP mode. Example: 00188C-nrf-wifiprov
+
+config WIFI_PROVISION_SOCKET_CLOSE_ON_COMPLETION
+	bool "Close socket on completion"
+	default y
+	help
+	  If this option is disabled, the socket will be kept open after provisioning has completed.
+	  This will keep mDNS SD running, allowing the device to be discovered by other devices
+	  on the registered hostname.
+
+config WIFI_PROVISION_CERTIFICATE_SEC_TAG
+	int "TLS credentials storage security tag"
+	default 88
+
+config WIFI_PROVISION_TCP_PORT
+	int "TCP port number"
+	default 443
+
+config WIFI_PROVISION_IPV4_ADDRESS
+	string "IPv4 address"
+	default "192.168.0.1"
+	help
+	  Network interface static IPv4 address. DHCPv4 will assign addresses starting from
+	  this address to connecting DHCPv4 clients.
+
+config WIFI_PROVISION_IPV4_NETMASK
+	string "IPv4 address"
+	default "255.255.255.0"
+
+config WIFI_PROVISION_MESSAGE_QUEUE_ENTRIES
+	int "Message queue entries"
+	default 5
+
+module = WIFI_PROVISION
+module-str = Wi-Fi provision
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif # WIFI_PROVISION
