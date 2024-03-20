@@ -1,0 +1,24 @@
+#
+# Copyright (c) 2024 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Wi-Fi provision"
+
+config WIFI_PROVISION_SAMPLE_POWER_SAVING_MODE
+	bool "Enable Wi-Fi power saving mode"
+	help
+	  Power saving mode is default off.
+	  Disabling Power Saving mode is needed to make the device discoverable reliably via
+	  mDNS. Service Discovery has proven to be unstabile in power saving mode. (DTIM)
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu
+
+module = WIFI_PROVISION_SAMPLE
+module-str = Wi-Fi provision sample
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endmenu
