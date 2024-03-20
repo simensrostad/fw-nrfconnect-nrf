@@ -1,0 +1,55 @@
+#
+# Copyright (c) 2024 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig WIFI_PROVISION
+	bool "Wifi provision"
+	depends on NANOPB
+	depends on NRF700X_AP_MODE
+	depends on WPA_SUPP_AP
+	depends on SMF
+	depends on NET_DHCPV4_SERVER
+	depends on TLS_CREDENTIALS
+	depends on WIFI_CREDENTIALS
+	depends on HTTP_PARSER
+	depends on HTTP_PARSER_URL
+	depends on NET_SOCKETS_SOCKOPT_TLS
+	depends on !NET_CONFIG_AUTO_INIT
+	depends on !NET_CONFIG_SETTINGS
+
+if WIFI_PROVISION
+
+config WIFI_PROVISION_SSID
+	string "SSID"
+	default "mobileappsrules"
+
+config WIFI_PROVISION_CERTIFICATE_SEC_TAG
+	int "TLS credentials storage security tag"
+	default 88
+
+config WIFI_PROVISION_TCP_PORT
+	int "TCP port number"
+	default 443
+
+config WIFI_PROVISION_IPV4_ADDRESS
+	string "IPv4 address"
+	default "192.168.0.1"
+	help
+	  Network interface static IPv4 address. DHCPv4 will assign addresses starting from
+	  this address to connecting DHCPv4 clients.
+
+config WIFI_PROVISION_IPV4_NETMASK
+	string "IPv4 address"
+	default "255.255.255.0"
+
+config WIFI_PROVISION_MESSAGE_QUEUE_ENTRIES
+	int "Message queue entries"
+	default 5
+
+module = WIFI_PROVISION
+module-str = Wi-Fi provision
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif # WIFI_PROVISION
