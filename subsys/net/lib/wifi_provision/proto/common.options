@@ -1,0 +1,3 @@
+WifiInfo.ssid max_size:32 fixed_length:true
+WifiConfig.passphrase max_size:32 fixed_length:true
+ScanResults.results max_count:5
