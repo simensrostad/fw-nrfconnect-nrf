@@ -1,0 +1,27 @@
+#
+# Copyright (c) 2024 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# config WIFI_PROVISION
+# 	bool
+# 	default y
+
+# config WIFI_PROVISION_SERVER_CERTIFICATE_REGISTER
+# 	bool
+# 	default n
+
+# config NET_HOSTNAME
+# 	string
+# 	default "hostname"
+
+# config NET_MGMT_EVENT_INFO
+# 	bool
+# 	default y
+
+# config WIFI_NM_WPA_SUPPLICANT
+# 	bool
+# 	default n
+
+source "Kconfig.zephyr"

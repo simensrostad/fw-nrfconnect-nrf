@@ -1,0 +1,6 @@
+tests:
+  net.lib.wifi_provision:
+    platform_allow: native_posix
+    integration_platforms:
+      - native_posix
+    tags: wifi_provision
