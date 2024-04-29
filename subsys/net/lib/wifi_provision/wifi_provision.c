@@ -30,8 +30,13 @@
 
 LOG_MODULE_REGISTER(wifi_provision, CONFIG_WIFI_PROVISION_LOG_LEVEL);
 
+/* Versioning, used in the mDNS SD TXT record. */
+#define TXT_RECORD_VESION "1"
+#define PROTOCOL_VESION "1"
+
 /* HTTP responses for demonstration */
 #define RESPONSE_200 "HTTP/1.1 200 OK\r\n"
+#define RESPONSE_403 "HTTP/1.1 403 Forbidden\r\n"
 #define RESPONSE_404 "HTTP/1.1 404 Not Found\r\n"
 #define RESPONSE_405 "HTTP/1.1 405 Method Not Allowed\r\n"
 
@@ -44,9 +49,6 @@ LOG_MODULE_REGISTER(wifi_provision, CONFIG_WIFI_PROVISION_LOG_LEVEL);
 		       NET_EVENT_WIFI_CONNECT_RESULT		| \
 		       NET_EVENT_WIFI_AP_STA_DISCONNECTED)
 
-/* Size of the NIC address section of the link address (MAC). */
-#define NIC_ADDR_SIZE 6
-
 /* Internal variables */
 static struct net_mgmt_event_callback net_l2_mgmt_cb;
 static ScanResults scan = ScanResults_init_zero;
@@ -55,6 +57,11 @@ static size_t scan_result_buffer_len;
 static const struct smf_state state[];
 static struct http_parser_settings parser_settings;
 static char linkaddr_string[sizeof("xxxxxxxxxxxx")];
+/* Atomic variable set when the application calls wifi_provision_client_access_grant().
+ * Used to allow a connected client access to internal HTTP resources.
+ */
+static atomic_t client_access_granted = ATOMIC_INIT(0);
+static uint8_t client_mac_granted[WIFI_MAC_ADDR_LEN];
 /* Semaphore used to block wifi_provision_start() until provisioning has completed. */
 static K_SEM_DEFINE(wifi_provision_sem, 0, 1);
 
@@ -66,14 +73,22 @@ static bool credentials_stored;
 /* Local reference to callers handler, used to send events to the application. */
 static wifi_provision_evt_handler_t handler_cb;
 
-/* Populate mDNS SD TXT record with the link address, subtract 1 to not account for two
- * string termination characters.
+/* Calculate the size of the mDNS SD TXT record.
+ * Per RFC6763, TXT Record entries are structured into key-value pairs where each entry is preceded
+ * by the total total size of the respective entry.
  *
- * As per RFC6763, the TXT Record is a key-value pair and it shall be preceded by the total size of
- * the key-value pair. Hence we hardcode '\x15' as a prefix as this is the
- * hex representation of 21 which is the total size of 'linkaddress=' and the link address.
+ * txtvers: Version of the TXT record.
+ * protovers: Version of the protocol used to communicate with the device.
+ * linkaddr: MAC address of the device.
+ *
+ * Make sure that buffer does not contain any null-terminators by reducing the size of the buffer
+ * according to the number of sizeof() statments.
  */
-static char txt_record[sizeof("\x15linkaddr=") + sizeof(linkaddr_string) - 1];
+static char txt_record[
+	sizeof("\xA0txtvers=") + sizeof(TXT_RECORD_VESION) +
+	sizeof("\xB0protovers=") + sizeof(PROTOCOL_VESION) +
+	sizeof("\x15linkaddr=") + sizeof(linkaddr_string) - 6
+];
 
 /* Register service */
 DNS_SD_REGISTER_TCP_SERVICE(wifi_provision_sd, CONFIG_NET_HOSTNAME, "_http", "local",
@@ -88,6 +103,8 @@ enum module_event {
 	EVENT_AP_ENABLE,
 	EVENT_AP_DISABLE,
 	EVENT_SCAN_DONE,
+	EVENT_HTTP_CLIENT_ACCESS_GRANT,
+	EVENT_HTTP_CLIENT_ACCESS_DENY,
 	EVENT_CREDENTIALS_RECEIVED,
 	EVENT_RESET
 };
@@ -140,6 +157,13 @@ static const unsigned char server_private_key[] = {
 	(0x00)
 };
 #endif /* CONFIG_WIFI_PROVISION_SERVER_CERTIFICATE_REGISTER */
+
+/* Convenience function to print MAC and a prefix string. */
+static void print_mac(const char *str, const uint8_t *mac)
+{
+	LOG_DBG("%s%02X:%02X:%02X:%02X:%02X:%02X",
+		str, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
 
 /* Function to notify application */
 static void notify_app(enum wifi_provision_evt_type type)
@@ -280,10 +304,30 @@ static void net_mgmt_wifi_event_handler(struct net_mgmt_event_callback *cb, uint
 	case NET_EVENT_WIFI_AP_STA_CONNECTED:
 		LOG_DBG("NET_EVENT_WIFI_AP_STA_CONNECTED");
 
+		/* Store the MAC address of the connected STA.
+		 * This variable is used to grant access to internal HTTP resources, when
+		 * the application calls wifi_provision_client_access_grant().
+		 *
+		 * This logic is designed to only support a single STA at the time. A new client
+		 * will be given priority over an old one and will get its MAC written to the
+		 * client_mac_granted variable.
+		 *
+		 * client_access_granted will be reset, meaning that a new call to
+		 * wifi_provision_client_access_grant() is needed for access for new clients.
+		 */
+		atomic_set(&client_access_granted, false);
+		memcpy(client_mac_granted, cb->info, WIFI_MAC_ADDR_LEN);
+
+		print_mac("Client connected, MAC: ", client_mac_granted);
+
 		notify_app(WIFI_PROVISION_EVT_CLIENT_CONNECTED);
 		break;
 	case NET_EVENT_WIFI_AP_STA_DISCONNECTED:
 		LOG_DBG("NET_EVENT_WIFI_AP_STA_DISCONNECTED");
+		print_mac("Client disconnected, MAC: ", cb->info);
+
+		atomic_set(&client_access_granted, false);
+		memset(client_mac_granted, 0, WIFI_MAC_ADDR_LEN);
 
 		notify_app(WIFI_PROVISION_EVT_CLIENT_DISCONNECTED);
 		break;
@@ -327,29 +371,15 @@ static int ap_enable(void)
 {
 	int ret;
 	struct net_if *iface = net_if_get_first_wifi();
-	static struct wifi_connect_req_params params = { 0 };
-
-	/* Combine the NIC specific part of the link address and CONFIG_WIFI_PROVISION_SSID_SUFFIX.
-	 * This is used to create a unique SSID for the AP so that multiple devices on the same
-	 * network can be distinguished.
-	 */
-	char ssid[NIC_ADDR_SIZE + sizeof(CONFIG_WIFI_PROVISION_SSID_SUFFIX)];
-	char *nic_addr = linkaddr_string + NIC_ADDR_SIZE;
-
-	/* Copy the last bytes of the MAC address to the SSID buffer. */
-	strncpy(ssid, nic_addr, NIC_ADDR_SIZE);
-	ssid[NIC_ADDR_SIZE] = '\0';
-
-	/* Append the static SSID to the SSID buffer. */
-	strncat(ssid, CONFIG_WIFI_PROVISION_SSID_SUFFIX, sizeof(ssid) - 1);
-
-	params.timeout = SYS_FOREVER_MS;
-	params.band = WIFI_FREQ_BAND_UNKNOWN;
-	params.channel = WIFI_CHANNEL_ANY;
-	params.security = WIFI_SECURITY_TYPE_NONE;
-	params.mfp = WIFI_MFP_OPTIONAL;
-	params.ssid = ssid;
-	params.ssid_length = strlen(ssid);
+	static struct wifi_connect_req_params params = {
+		.timeout = SYS_FOREVER_MS,
+		.band = WIFI_FREQ_BAND_UNKNOWN,
+		.channel = WIFI_CHANNEL_ANY,
+		.security = WIFI_SECURITY_TYPE_NONE,
+		.mfp = WIFI_MFP_OPTIONAL,
+		.ssid = CONFIG_WIFI_PROVISION_SSID,
+		.ssid_length = strlen(CONFIG_WIFI_PROVISION_SSID)
+	};
 
 	ret = net_mgmt(NET_REQUEST_WIFI_AP_ENABLE, iface, &params,
 		       sizeof(struct wifi_connect_req_params));
@@ -375,7 +405,6 @@ static int ap_disable(void)
 	return 0;
 }
 
-/* Update this function to parse using NanoPB. */
 static int parse_and_store_credentials(const char *body, size_t body_len)
 {
 	int ret;
@@ -544,9 +573,7 @@ static void init_entry(void *o)
 	/* Populate mDNS-SD TXT record with MAC address. */
 	struct net_linkaddr *linkaddr = net_if_get_link_addr(net_if_get_first_wifi());
 
-	/* Construct TXT record.
-	 * \x15 is the length of the constructed TXT record entry "linkaddr=XXXXXXXXXXXX"
-	 */
+	/* Construct TXT record. */
 	snprintk(linkaddr_string, sizeof(linkaddr_string), "%02X%02X%02X%02X%02X%02X",
 		 linkaddr->addr[0],
 		 linkaddr->addr[1],
@@ -555,7 +582,13 @@ static void init_entry(void *o)
 		 linkaddr->addr[4],
 		 linkaddr->addr[5]);
 
-	snprintk(txt_record, sizeof(txt_record), "\x15linkaddr=%s", linkaddr_string);
+	snprintk(txt_record, sizeof(txt_record),
+		 "\xA0txtvers=%s"
+		 "\xB0protovers=%s"
+		 "\x15linkaddr=%s",
+		 TXT_RECORD_VESION,
+		 PROTOCOL_VESION,
+		 linkaddr_string);
 
 	net_mgmt_init_event_callback(&net_l2_mgmt_cb,
 				     net_mgmt_wifi_event_handler,
@@ -678,12 +711,34 @@ static void provisioning_run(void *o)
 		smf_set_state(SMF_CTX(&state_object), &state[STATE_PROVISIONED]);
 	} else if (user_object->event_next == EVENT_RESET) {
 		smf_set_state(SMF_CTX(&state_object), &state[STATE_RESET]);
+	} else if ((user_object->event_next == EVENT_HTTP_CLIENT_ACCESS_GRANT) ||
+		   (user_object->event_next == EVENT_HTTP_CLIENT_ACCESS_DENY)) {
+
+		if (memcmp(client_mac_granted, (uint8_t[6]){0}, WIFI_MAC_ADDR_LEN) == 0) {
+			LOG_ERR("Client MAC address not set, cannot %s access",
+				(user_object->event_next == EVENT_HTTP_CLIENT_ACCESS_GRANT) ?
+				"grant" : "deny");
+			return;
+		}
+
+		LOG_DBG("Access %s for client MAC: %02X:%02X:%02X:%02X:%02X:%02X",
+			((user_object->event_next == EVENT_HTTP_CLIENT_ACCESS_GRANT) ?
+			"granted" : "denied"),
+			client_mac_granted[0],
+			client_mac_granted[1],
+			client_mac_granted[2],
+			client_mac_granted[3],
+			client_mac_granted[4],
+			client_mac_granted[5]);
+
+		atomic_set(&client_access_granted,
+			   (user_object->event_next == EVENT_HTTP_CLIENT_ACCESS_GRANT));
 	} else {
 		LOG_DBG("Unknown event, skipping state transition.");
 	}
 }
 
-/*Wi-Fi credentials received, provisioned has completed, cleanup and disable AP mode. */
+/* Wi-Fi credentials received, provisioned has completed, cleanup and disable AP mode. */
 static void provisioned_entry(void *o)
 {
 	ARG_UNUSED(o);
@@ -725,8 +780,9 @@ static void provisioned_exit(void *o)
 {
 	ARG_UNUSED(o);
 
-	/* Clear the request structure post provisioning. */
 	memset(&request, 0, sizeof(struct http_req));
+	memset(client_mac_granted, 0, WIFI_MAC_ADDR_LEN);
+	atomic_set(&client_access_granted, false);
 }
 
 /* We have received Wi-Fi credentials and is considered provisioned, disable AP mode. */
@@ -818,8 +874,8 @@ static int send_response(struct http_req *request, char *response, size_t len)
 	return 0;
 }
 
-int method_check(enum http_method method, enum http_method method_expected,
-		 char *response, size_t len)
+int method_verify(enum http_method method, enum http_method method_expected,
+		  char *response, size_t len)
 {
 	int ret;
 
@@ -844,28 +900,27 @@ int method_check(enum http_method method, enum http_method method_expected,
 }
 
 /* Handle HTTP request */
-static int handle_http_request(struct http_req *request)
+static int handle_http_request(struct http_req *request, char *response, size_t len)
 {
 	int ret;
-	char response[CONFIG_WIFI_PROVISION_RESPONSE_BUFFER_SIZE] = { 0 };
 
 	if ((strlen(request->url) == sizeof("/prov/networks") - 1) &&
 	    (strncmp(request->url, "/prov/networks", strlen(request->url)) == 0)) {
 		/* Wi-Fi scan requested, return the cached scan results. */
 
-		ret = method_check(request->method, HTTP_GET, response, sizeof(response));
+		ret = method_verify(request->method, HTTP_GET, response, len);
 		if (ret == -ENOTSUP) {
 			LOG_DBG("Method not allowed, error: %d", ret);
 			return 0;
 		} else if (ret) {
-			LOG_ERR("method_check, error: %d", ret);
+			LOG_ERR("method_verify, error: %d", ret);
 			return ret;
 		}
 
-		ret = snprintk(response, sizeof(response),
+		ret = snprintk(response, len,
 			"%sContent-Type: application/x-protobuf\r\nContent-Length: %d\r\n\r\n",
 			RESPONSE_200, scan_result_buffer_len);
-		if ((ret < 0) || (ret >= sizeof(response))) {
+		if ((ret < 0) || (ret >= len)) {
 			LOG_DBG("snprintk, error: %d", ret);
 			return ret;
 		}
@@ -888,12 +943,12 @@ static int handle_http_request(struct http_req *request)
 		   (strncmp(request->url, "/prov/configure", strlen(request->url)) == 0)) {
 		/* Wi-Fi provisioning requested, parse the body and store the credentials. */
 
-		ret = method_check(request->method, HTTP_POST, response, sizeof(response));
+		ret = method_verify(request->method, HTTP_POST, response, len);
 		if (ret == -ENOTSUP) {
 			LOG_DBG("Method not allowed, error: %d", ret);
 			return 0;
 		} else if (ret) {
-			LOG_ERR("method_check, error: %d", ret);
+			LOG_ERR("method_verify, error: %d", ret);
 			return ret;
 		}
 
@@ -903,9 +958,8 @@ static int handle_http_request(struct http_req *request)
 			return ret;
 		}
 
-		ret = snprintk(response, sizeof(response), "%sContent-Length: %d\r\n\r\n",
-			       RESPONSE_200, 0);
-		if ((ret < 0) || (ret >= sizeof(response))) {
+		ret = snprintk(response, len, "%sContent-Length: %d\r\n\r\n", RESPONSE_200, 0);
+		if ((ret < 0) || (ret >= len)) {
 			LOG_DBG("snprintk, error: %d", ret);
 			return ret;
 		}
@@ -916,20 +970,14 @@ static int handle_http_request(struct http_req *request)
 			return ret;
 		}
 
-		/* Wait to avoid flushing TX data in the Wi-Fi stack before all data has
-		 * transmitted successfully.
-		 */
-		k_sleep(K_SECONDS(1));
-
 		credentials_stored = true;
 
 		new_event(EVENT_CREDENTIALS_RECEIVED);
 	} else {
 		LOG_DBG("Unrecognized HTTP resource, ignoring...");
 
-		ret = snprintk(response, sizeof(response), "%sContent-Length: %d\r\n\r\n",
-			       RESPONSE_404, 0);
-		if ((ret < 0) || (ret >= sizeof(response))) {
+		ret = snprintk(response, len, "%sContent-Length: %d\r\n\r\n", RESPONSE_404, 0);
+		if ((ret < 0) || (ret >= len)) {
 			LOG_DBG("snprintk, error: %d", ret);
 			return ret;
 		}
@@ -945,6 +993,34 @@ static int handle_http_request(struct http_req *request)
 	return 0;
 }
 
+/* Function used to check if the application has granted access for an incoming HTTP client. */
+static bool has_access(struct http_req *request, char *response, size_t len)
+{
+	int ret;
+
+	if (atomic_get(&client_access_granted) == 1) {
+		return true;
+	}
+
+	/* Access denied, send 403 Forbidden response. */
+	notify_app(WIFI_PROVISION_EVT_CLIENT_ACCESS_DENIED);
+
+	ret = snprintk(response, len, "%sContent-Length: %d\r\n\r\n", RESPONSE_403, 0);
+	if ((ret < 0) || (ret >= len)) {
+		LOG_DBG("snprintk, error: %d", ret);
+		return ret;
+	}
+
+	/* Send headers */
+	ret = send_response(request, response, strlen(response));
+	if (ret) {
+		LOG_ERR("send_response (headers), error: %d", ret);
+		return ret;
+	}
+
+	return false;
+}
+
 static int process_tcp(sa_family_t family)
 {
 	int client;
@@ -953,7 +1029,8 @@ static int process_tcp(sa_family_t family)
 	char addr_str[INET6_ADDRSTRLEN];
 	int received;
 	int ret = 0;
-	char buf[CONFIG_WIFI_PROVISION_TCP_RECV_BUF_SIZE];
+	char buf[CONFIG_WIFI_PROVISION_TCP_RECV_BUF_SIZE] = { 0 };
+	char response[CONFIG_WIFI_PROVISION_RESPONSE_BUFFER_SIZE] = { 0 };
 	size_t offset = 0;
 	size_t total_received = 0;
 
@@ -982,7 +1059,11 @@ static int process_tcp(sa_family_t family)
 			goto socket_close;
 		}
 
-		/* Parse the received data as HTTP request */
+		if (!has_access(&request, response, sizeof(response))) {
+			LOG_ERR("Access denied, closing connection");
+			goto socket_close;
+		}
+
 		(void)http_parser_execute(&request.parser,
 					  &parser_settings, buf + offset, received);
 
@@ -997,7 +1078,7 @@ static int process_tcp(sa_family_t family)
 		 * proceed to process the request.
 		 */
 		if (request.received_all) {
-			handle_http_request(&request);
+			handle_http_request(&request, response, sizeof(response));
 			break;
 		}
 	};
@@ -1124,7 +1205,7 @@ int wifi_provision_start(void)
 	if (!wifi_credentials_is_empty()) {
 		LOG_DBG("Stored Wi-Fi credentials found, already provisioned");
 		notify_app(WIFI_PROVISION_EVT_COMPLETED);
-		return 0;
+		return -EALREADY;
 	}
 
 	new_event(EVENT_PROVISIONING_START);
@@ -1140,10 +1221,32 @@ int wifi_provision_start(void)
 	return 0;
 }
 
+int wifi_provision_client_access_grant(void)
+{
+	if (state_object.ctx.current == NULL) {
+		LOG_ERR("Library not initialized");
+		return -ENOTSUP;
+	}
+
+	new_event(EVENT_HTTP_CLIENT_ACCESS_GRANT);
+	return 0;
+}
+
+int wifi_provision_client_access_deny(void)
+{
+	if (state_object.ctx.current == NULL) {
+		LOG_ERR("Library not initialized");
+		return -ENOTSUP;
+	}
+
+	new_event(EVENT_HTTP_CLIENT_ACCESS_DENY);
+	return 0;
+}
+
 int wifi_provision_reset(void)
 {
 	if (state_object.ctx.current == NULL) {
-		LOG_ERR("Library not initialized, cannot reset");
+		LOG_ERR("Library not initialized");
 		return -ENOTSUP;
 	}
 

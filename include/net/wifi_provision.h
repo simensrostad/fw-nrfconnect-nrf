@@ -35,13 +35,19 @@ enum wifi_provision_evt_type {
 	/** A client has disconnected from the provisioning network. */
 	WIFI_PROVISION_EVT_CLIENT_DISCONNECTED,
 
+	/** A client was denied access to an internal resource.
+	 *  To grant the client access, the application must call
+	 *  wifi_provision_client_access_grant().
+	 */
+	WIFI_PROVISION_EVT_CLIENT_ACCESS_DENIED,
+
 	/** Wi-Fi credentials received. */
 	WIFI_PROVISION_EVT_CREDENTIALS_RECEIVED,
 
 	/** The provisioning process has completed. */
 	WIFI_PROVISION_EVT_COMPLETED,
 
-	/** Wi-Fi credentials deleted, a reboot is required to enter a known unprovisioned state. */
+	/** Wi-Fi credentials deleted, a reboot is required to enter an unprovisioned state. */
 	WIFI_PROVISION_EVT_RESET_REBOOT_REQUEST,
 
 	/** The provisioning process has failed, irrecoverable error. */
@@ -82,6 +88,32 @@ int wifi_provision_init(const wifi_provision_evt_handler_t handler);
  * @returns 0 if successful. Otherwise, a negative error code is returned (errno.h).
  * @retval -ENOTSUP if the library is not initialized.
  * @retval -EINPROGRESS if provisioning is already in progress.
+ * @retval -EALREADY if the device is already provisioned. Credentials was found in
+ * 		     Wi-Fi credentials storage.
+ */
+int wifi_provision_start(void);
+
+/**
+ * @brief Allow a client to access the library's HTTP internal resources.
+ *
+ * When this function is called, the client (STA) that connected to the softAP the last is given
+ * access to read and write the internal provisioning resources of the library.
+ *
+ * @returns 0 if successful. Otherwise, a negative error code is returned (errno.h).
+ * @retval -ENOTSUP if the library is not initialized.
+ */
+int wifi_provision_client_access_grant(void);
+
+/**
+ * @brief Deny a client access to the library's internal HTTP resources.
+ *
+ * @returns 0 if successful. Otherwise, a negative error code is returned (errno.h).
+ * @retval -ENOTSUP if the library is not initialized.
+ */
+int wifi_provision_client_access_deny(void);
+
+/**
+ * @brief Start the Wi-Fi provisioning process.
  */
 int wifi_provision_start(void);
 

@@ -100,6 +100,9 @@ static void wifi_provision_handler(const struct wifi_provision_evt *evt)
 	case WIFI_PROVISION_EVT_CLIENT_DISCONNECTED:
 		LOG_INF("Client disconnected");
 		break;
+	case WIFI_PROVISION_EVT_CLIENT_ACCESS_DENIED:
+		LOG_INF("Client access denied, press button 1 to grant access.");
+		break;
 	case WIFI_PROVISION_EVT_CREDENTIALS_RECEIVED:
 		LOG_INF("Wi-Fi credentials received");
 		break;
@@ -124,14 +127,30 @@ static void wifi_provision_handler(const struct wifi_provision_evt *evt)
 
 static void button_handler(uint32_t button_states, uint32_t has_changed)
 {
+	int ret;
+
 	if ((has_changed & DK_BTN1_MSK) && (button_states & DK_BTN1_MSK)) {
 		LOG_INF("Button 1 pressed");
 
-		/* Give a semaphore instead of calling wifi_provision_start() directly.
-		 * This is to offload the aforementioned call to the main thread.
-		 * This is needed to not block the button handler thread.
-		 */
-		k_sem_give(&provision_start_sem);
+		static uint32_t counter;
+
+		if (counter % 2 == 0) {
+			ret = wifi_provision_client_access_grant();
+			if (ret) {
+				LOG_ERR("wifi_provision_client_access_grant, error: %d", ret);
+				FATAL_ERROR();
+				return;
+			}
+		} else {
+			ret = wifi_provision_client_access_deny();
+			if (ret) {
+				LOG_ERR("wifi_provision_client_access_deny, error: %d", ret);
+				FATAL_ERROR();
+				return;
+			}
+		}
+
+		counter++;
 	}
 
 	if ((has_changed & DK_BTN2_MSK) && (button_states & DK_BTN2_MSK)) {
@@ -250,24 +269,18 @@ int main(void)
 
 	LOG_INF("Network interface brought up");
 
-	if (wifi_credentials_is_empty()) {
-		LOG_INF("Wi-Fi credentials empty, press button 1 to start provisioning");
-
-		k_sem_take(&provision_start_sem, K_FOREVER);
-
-		LOG_INF("Starting provisioning");
-
-		ret = wifi_provision_start();
-		if (ret) {
-			LOG_ERR("wifi_provision_start, error: %d", ret);
-			FATAL_ERROR();
-			return ret;
-		}
-
+	ret = wifi_provision_start();
+	switch (ret) {
+	case 0:
 		provisioning_completed = true;
-
-	} else {
+		break;
+	case -EALREADY:
 		LOG_INF("Wi-Fi credentials found, skipping provisioning");
+		break;
+	default:
+		LOG_ERR("wifi_provision_start, error: %d", ret);
+		FATAL_ERROR();
+		return ret;
 	}
 
 	/* Register NET mgmt handlers for Connection Manager events after provisioning

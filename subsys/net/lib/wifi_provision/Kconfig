@@ -5,7 +5,8 @@
 #
 
 menuconfig WIFI_PROVISION
-	bool "Wifi provision"
+	bool "Wifi provision [EXPERIMENTAL]"
+	select EXPERIMENTAL
 	depends on NANOPB
 	depends on NRF700X_AP_MODE
 	depends on WPA_SUPP_AP
@@ -62,12 +63,11 @@ config WIFI_PROVISION_BODY_MAX_SIZE
 	int "Body max size"
 	default 256
 
-config WIFI_PROVISION_SSID_SUFFIX
-	string "SSID suffix"
-	default "-nrf-wifiprov"
+config WIFI_PROVISION_SSID
+	string "SSID"
+	default "nrf-wifiprov"
 	help
-	  Suffix appended to the last 3 hex values of the device's MAC address
-	  to form the advertised SSID in softAP mode. Example: 00188C-nrf-wifiprov
+	  The default SSID of the Wi-Fi network that the device will broadcast in softAP mode.
 
 config WIFI_PROVISION_SOCKET_CLOSE_ON_COMPLETION
 	bool "Close socket on completion"
