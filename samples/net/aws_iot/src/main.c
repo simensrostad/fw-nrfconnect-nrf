@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <hw_id.h>
 #include <modem/modem_info.h>
+#include <net/softap_wifi_provision.h>
 
 #include "json_payload.h"
 
@@ -53,6 +54,8 @@ static void aws_iot_event_handler(const struct aws_iot_evt *const evt);
 /* Work items used to control some aspects of the sample. */
 static K_WORK_DELAYABLE_DEFINE(shadow_update_work, shadow_update_work_fn);
 static K_WORK_DELAYABLE_DEFINE(connect_work, connect_work_fn);
+
+static bool provisioned;
 
 /* Static functions */
 
@@ -331,7 +334,11 @@ static void l4_event_handler(struct net_mgmt_event_callback *cb,
 	switch (event) {
 	case NET_EVENT_L4_CONNECTED:
 		LOG_INF("Network connectivity established");
-		on_net_event_l4_connected();
+
+		if (provisioned) {
+			on_net_event_l4_connected();
+		}
+
 		break;
 	case NET_EVENT_L4_DISCONNECTED:
 		LOG_INF("Network connectivity lost");
@@ -353,6 +360,39 @@ static void connectivity_event_handler(struct net_mgmt_event_callback *cb,
 		return;
 	}
 }
+
+#if defined(CONFIG_SOFTAP_WIFI_PROVISION)
+static void softap_wifi_provision_handler(const struct softap_wifi_provision_evt *evt)
+{
+	switch (evt->type) {
+	case SOFTAP_WIFI_PROVISION_EVT_STARTED:
+		LOG_INF("Provisioning started");
+		break;
+	case SOFTAP_WIFI_PROVISION_EVT_CLIENT_CONNECTED:
+		LOG_INF("Client connected");
+		break;
+	case SOFTAP_WIFI_PROVISION_EVT_CLIENT_DISCONNECTED:
+		LOG_INF("Client disconnected");
+		break;
+	case SOFTAP_WIFI_PROVISION_EVT_CREDENTIALS_RECEIVED:
+		LOG_INF("Wi-Fi credentials received");
+		break;
+	case SOFTAP_WIFI_PROVISION_EVT_COMPLETED:
+		LOG_INF("Provisioning completed");
+		break;
+	case SOFTAP_WIFI_PROVISION_EVT_UNPROVISIONED_REBOOT_NEEDED:
+		LOG_INF("Reboot request notified, rebooting...");
+		break;
+	case SOFTAP_WIFI_PROVISION_EVT_FATAL_ERROR:
+		LOG_ERR("Provisioning failed, fatal error!");
+		FATAL_ERROR();
+		break;
+	default:
+		/* Don't care */
+		return;
+	}
+}
+#endif /* CONFIG_SOFTAP_WIFI_PROVISION */
 
 int main(void)
 {
@@ -379,6 +419,29 @@ int main(void)
 		FATAL_ERROR();
 		return err;
 	}
+
+#if defined(CONFIG_SOFTAP_WIFI_PROVISION)
+	err = softap_wifi_provision_init(softap_wifi_provision_handler);
+	if (err) {
+		LOG_ERR("softap_wifi_provision_init, error: %d", err);
+		FATAL_ERROR();
+		return err;
+	}
+
+	err = softap_wifi_provision_start();
+	switch (err) {
+	case 0:
+		provisioned = true;
+		break;
+	case -EALREADY:
+		LOG_INF("Wi-Fi credentials found, skipping provisioning");
+		break;
+	default:
+		LOG_ERR("softap_wifi_provision_start, error: %d", err);
+		FATAL_ERROR();
+		return err;
+	}
+#endif /* CONFIG_SOFTAP_WIFI_PROVISION */
 
 	err = conn_mgr_all_if_connect(true);
 	if (err) {
