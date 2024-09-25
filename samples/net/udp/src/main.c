@@ -12,6 +12,15 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/conn_mgr_monitor.h>
+#include <date_time.h>
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+
+#define GPIO_PIN 9
+
+static const struct device *const dev = DEVICE_DT_GET(DT_ALIAS(gpio9));
 
 #if defined(CONFIG_POSIX_API)
 #include <zephyr/posix/arpa/inet.h>
@@ -20,8 +29,6 @@
 #endif
 
 LOG_MODULE_REGISTER(udp_sample, CONFIG_UDP_SAMPLE_LOG_LEVEL);
-
-#define UDP_IP_HEADER_SIZE 28
 
 /* Macros used to subscribe to specific Zephyr NET management events. */
 #define L4_EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
@@ -36,83 +43,93 @@ LOG_MODULE_REGISTER(udp_sample, CONFIG_UDP_SAMPLE_LOG_LEVEL);
 /* Zephyr NET management event callback structures. */
 static struct net_mgmt_event_callback l4_cb;
 static struct net_mgmt_event_callback conn_cb;
+static void date_time_event_handler(const struct date_time_evt *evt);
+static void getup_work_fn(struct k_work *work);
 
-/* Variables used to perform socket operations. */
-static int fd;
-static struct sockaddr_storage host_addr;
+static K_WORK_DELAYABLE_DEFINE(getup_work, getup_work_fn);
 
-/* Forward declarations */
-static void server_transmission_work_fn(struct k_work *work);
-
-/* Work item used to schedule periodic UDP transmissions. */
-static K_WORK_DELAYABLE_DEFINE(server_transmission_work, server_transmission_work_fn);
-
-static void server_transmission_work_fn(struct k_work *work)
+static void getup_work_fn(struct k_work *work)
 {
-	int err;
-	char buffer[CONFIG_UDP_SAMPLE_DATA_UPLOAD_SIZE_BYTES] = {"\0"};
+	int ret;
 
-	LOG_INF("Transmitting UDP/IP payload of %d bytes to the "
-		"IP address %s, port number %d",
-		CONFIG_UDP_SAMPLE_DATA_UPLOAD_SIZE_BYTES + UDP_IP_HEADER_SIZE,
-		CONFIG_UDP_SAMPLE_SERVER_ADDRESS_STATIC,
-		CONFIG_UDP_SAMPLE_SERVER_PORT);
+	LOG_INF("It's time to get up!");
 
-	err = send(fd, buffer, sizeof(buffer), 0);
-	if (err < 0) {
-		LOG_ERR("Failed to transmit UDP packet, %d", -errno);
+	ret = gpio_pin_configure(dev, GPIO_PIN, GPIO_OUTPUT_ACTIVE);
+	if (ret < 0) {
+		printk("Error: Failed to configure GPIO 9\n");
 		return;
 	}
 
-	(void)k_work_reschedule(&server_transmission_work,
-				K_SECONDS(CONFIG_UDP_SAMPLE_DATA_UPLOAD_FREQUENCY_SECONDS));
-}
-
-static int server_addr_construct(void)
-{
-	int err;
-
-	struct sockaddr_in *server4 = ((struct sockaddr_in *)&host_addr);
-
-	server4->sin_family = AF_INET;
-	server4->sin_port = htons(CONFIG_UDP_SAMPLE_SERVER_PORT);
-
-	err = inet_pton(AF_INET, CONFIG_UDP_SAMPLE_SERVER_ADDRESS_STATIC, &server4->sin_addr);
-	if (err < 0) {
-		LOG_ERR("inet_pton, error: %d", -errno);
-		return err;
+	while (1) {
+		gpio_pin_toggle(dev, GPIO_PIN);
+		k_msleep(1000);
 	}
 
-	return 0;
+	date_time_update_async(date_time_event_handler);
+}
+
+static void obtain_time(void)
+{
+	int err;
+	int64_t date_time;
+	struct tm tm;
+
+	err = date_time_now(&date_time);
+	if (err) {
+		LOG_ERR("date_time_now, error: %d", err);
+		FATAL_ERROR();
+		return;
+	}
+
+	date_time /= MSEC_PER_SEC;
+
+	(void)gmtime_r(&date_time, &tm);
+
+	LOG_INF("Current date and time: %d-%02d-%02d %02d:%02d:%02d",
+		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+		tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	/* Schedule a timer that triggers at 12:00 */
+
+	/* Calculate the time until 12:00 */
+	int64_t time_until_12 = (17 - tm.tm_hour) * 60 * 60 - tm.tm_min * 60 - tm.tm_sec;
+
+	/* Calculate the time until 12:00 the next day */
+	if (time_until_12 < 0) {
+		time_until_12 += 24 * 60 * 60;
+	}
+
+	LOG_WRN("Time until 12:00: %lld seconds", time_until_12);
+
+	getup_work_fn(NULL);
+}
+
+static void date_time_event_handler(const struct date_time_evt *evt)
+{
+	switch (evt->type) {
+	case DATE_TIME_OBTAINED_MODEM:
+	case DATE_TIME_OBTAINED_NTP:
+	case DATE_TIME_OBTAINED_EXT:
+		LOG_DBG("DATE_TIME OBTAINED");
+		obtain_time();
+		break;
+	case DATE_TIME_NOT_OBTAINED:
+		LOG_INF("DATE_TIME_NOT_OBTAINED");
+		break;
+	default:
+		break;
+	}
 }
 
 static void on_net_event_l4_connected(void)
 {
-	int err;
-
-	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (fd < 0) {
-		LOG_ERR("Failed to create UDP socket: %d", -errno);
-		FATAL_ERROR();
-		return;
-	}
-
-	err = connect(fd, (struct sockaddr *)&host_addr, sizeof(struct sockaddr_in));
-	if (err < 0) {
-		LOG_ERR("connect, error: %d", -errno);
-		FATAL_ERROR();
-		return;
-	}
-
-	(void)k_work_reschedule(&server_transmission_work, K_NO_WAIT);
+	date_time_update_async(date_time_event_handler);
 }
 
 static void on_net_event_l4_disconnected(void)
 {
-	(void)close(fd);
-	(void)k_work_cancel_delayable(&server_transmission_work);
 }
-
+§#
 static void l4_event_handler(struct net_mgmt_event_callback *cb,
 			     uint32_t event,
 			     struct net_if *iface)
@@ -156,13 +173,6 @@ int main(void)
 	/* Setup handler for Zephyr NET Connection Manager Connectivity layer. */
 	net_mgmt_init_event_callback(&conn_cb, connectivity_event_handler, CONN_LAYER_EVENT_MASK);
 	net_mgmt_add_event_callback(&conn_cb);
-
-	err = server_addr_construct();
-	if (err) {
-		LOG_INF("server_addr_construct, error: %d", err);
-		FATAL_ERROR();
-		return err;
-	}
 
 	/* Connecting to the configured connectivity layer.
 	 * Wi-Fi or LTE depending on the board that the sample was built for.

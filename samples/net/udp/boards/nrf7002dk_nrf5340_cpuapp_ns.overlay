@@ -1,0 +1,11 @@
+/*
+ * Copyright (c) 2024 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/ {
+	alias {
+		gpio9 = <&gpio0 9 GPIO_ACTIVE_LOW>;
+	};
+};
