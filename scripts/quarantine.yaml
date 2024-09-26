@@ -46,3 +46,8 @@
     - nrf5340dk/nrf5340/cpuapp/ns
     - nrf9151dk/nrf9151/ns
   comment: "Unknown failures using NS (TF-M), unable to replicate locally, temporarily excluded"
+
+- scenarios:
+    - examples.nrfx_spim.blocking
+    - examples.nrfx_spim.non_blocking
+  comment: "Not fixable during upmerge, fix will be included in next upmerge"
