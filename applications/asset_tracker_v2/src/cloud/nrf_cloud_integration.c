@@ -356,6 +356,20 @@ int cloud_wrap_batch_send(char *buf, size_t len, bool ack, uint32_t id)
 		return err;
 	}
 
+	struct nrf_cloud_modem_info modem_info = {
+		.sim = NRF_CLOUD_INFO_SET,
+	};
+
+	struct nrf_cloud_device_status dev_status = {
+		.modem = &modem_info,
+	};
+
+	err = nrf_cloud_shadow_device_status_update(&dev_status);
+	if (err) {
+		LOG_ERR("nrf_cloud_shadow_device_status_update, error: %d", err);
+		return err;
+	}
+
 	return 0;
 }
 
