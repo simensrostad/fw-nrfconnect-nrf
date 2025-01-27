@@ -12,6 +12,22 @@ config AT_CMD
 
 if AT_CMD
 
+config AT_CMD_COMMAND_TIMEOUT
+	int "AT command timeout (seconds)"
+	default 60
+	help
+	  Timeout for waiting for an AT command to be sent. If the command
+	  is not sent within this time, the AT command is considered to have
+	  failed and the library will return an error.
+
+config AT_CMD_RESPONSE_TIMEOUT
+	int "AT command response timeout (seconds)"
+	default 60
+	help
+	  Timeout for waiting for an AT command response. If the response
+	  is not received within this time, the AT command is considered
+	  to have failed and the libray will return an error.
+
 config AT_CMD_SYS_INIT
 	bool "Initialize the AT Command driver during system init"
 	default y if NRF_MODEM_LIB_SYS_INIT

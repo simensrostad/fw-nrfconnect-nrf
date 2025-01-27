@@ -383,6 +383,7 @@ int at_cmd_write(const char *const cmd,
 		 size_t buf_len,
 		 enum at_cmd_state *state)
 {
+	int err;
 	struct cmd_item command;
 	struct resp_item ret;
 
@@ -420,7 +421,7 @@ int at_cmd_write(const char *const cmd,
 	k_mutex_lock(&response_sync_get, K_FOREVER);
 
 	/* We borrow the return code field from the currently unused response */
-	ret.code = k_msgq_put(&commands, &command, K_FOREVER);
+	ret.code = k_msgq_put(&commands, &command, K_SECONDS(CONFIG_AT_CMD_COMMAND_TIMEOUT));
 	if (ret.code) {
 		LOG_ERR("Could not enqueue cmd, error %d", ret.code);
 		if (state) {
@@ -432,7 +433,13 @@ int at_cmd_write(const char *const cmd,
 	load_cmd_and_write();
 
 	LOG_DBG("Awaiting response for %s", log_strdup(cmd));
-	k_msgq_get(&response_sync, &ret, K_FOREVER);
+
+	err = k_msgq_get(&response_sync, &ret, K_SECONDS(CONFIG_AT_CMD_RESPONSE_TIMEOUT));
+	if (err == -EAGAIN) {
+		ret.state = AT_CMD_ERROR_WRITE;
+		ret.code = -EAGAIN;
+	}
+
 	k_mutex_unlock(&response_sync_get);
 
 	if (state) {
