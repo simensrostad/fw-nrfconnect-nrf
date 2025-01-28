@@ -15,6 +15,15 @@ config SLM_CUSTOMIZED
 	help
 	  Enable this flag to include customized logic.
 
+config SLM_WATCHDOG_SYSTEM_WORKQUEUE_TIMEOUT_MSEC
+	int "Watchdog timeout in milliseconds for system workqueue"
+	default 60000
+	help
+	  Timeout for system workqueue watchdog. This is used to monitor the responsiveness
+	  of the system workqueue, which in many cases is used by SLM for sending AT commands to the
+	  modem. Make sure that this value is higher than the longest expected time for the AT
+	  command to be processed by the modem.
+
 config SLM_AT_MODE
 	bool "Serial LTE Modem by raw AT mode"
 	default y

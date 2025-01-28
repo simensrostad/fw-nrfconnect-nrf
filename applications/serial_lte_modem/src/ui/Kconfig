@@ -56,10 +56,6 @@ config SLM_MOD_FLASH_PIN
 	help
 	  Default GPIO pin as modem flash led.
 
-config SLM_STATS_WATCHDOG
-	bool "Watchdog support in SLM"
-	select WATCHDOG
-
 config SLM_STATS_WATCHDOG_TIMEOUT_MSEC
 	int "Watchdog timeout in milliseconds"
 	default 60000

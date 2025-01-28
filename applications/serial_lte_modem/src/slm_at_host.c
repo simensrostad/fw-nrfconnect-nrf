@@ -16,11 +16,9 @@
 #include <init.h>
 #include <modem/at_cmd.h>
 #include <modem/at_notif.h>
-#if defined(CONFIG_SLM_STATS_WATCHDOG)
 #include <hal/nrf_power.h>
 #if defined(CONFIG_SLM_CUSTOMIZED_RS232)
 #include <hal/nrf_gpio.h>
-#endif
 #endif
 #if defined(CONFIG_SLM_DIAG)
 #include "slm_diag.h"
