@@ -169,6 +169,14 @@ void util_get_ip_addr(char *addr4, char *addr6);
  */
 int util_resolve_host(int cid, const char *host, uint16_t port, int family, struct sockaddr *sa);
 
+/**
+ * @brief Reboot the application with a delay.
+ *
+ * @param delay Delay in seconds before rebooting.
+ */
+void slm_util_reboot(uint32_t delay);
+
+
 /** @} */
 
 #endif /* SLM_UTIL_ */

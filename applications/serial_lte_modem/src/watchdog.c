@@ -11,6 +11,7 @@
 #include <task_wdt/task_wdt.h>
 #include <logging/log.h>
 
+#include "slm_util.h"
 #include "watchdog.h"
 
 LOG_MODULE_REGISTER(watchdog, CONFIG_SLM_LOG_LEVEL);
@@ -28,11 +29,9 @@ static void sys_workqueue_watchdog_callback(int channel_id, void *user_data)
 	ARG_UNUSED(channel_id);
 	ARG_UNUSED(user_data);
 
-	LOG_ERR("System workqueue watchdog triggered, rebooting in 3 seconds");
+	LOG_ERR("System workqueue watchdog triggered");
 
-	k_sleep(K_SECONDS(3));
-
-	sys_reboot(SYS_REBOOT_COLD);
+	slm_util_reboot(3);
 }
 
 static void feed_watchdog_work_fn(struct k_work *work)

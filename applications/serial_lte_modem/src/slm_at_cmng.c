@@ -86,10 +86,18 @@ int handle_at_cmng(enum at_cmd_type cmd_type)
 				if (written < 0 || written >= sizeof(cmd)) {
 					return -ENOBUFS;
 				}
+
 				err = at_cmd_write(cmd, rsp_buf, CONFIG_AT_CMD_RESPONSE_MAX_LEN, &state);
-				if (err) {
+				if (err == -EAGAIN) {
+					LOG_ERR("AT command timed out, indicating a modem issue");
+					slm_util_reboot(3);
+
+					CODE_UNREACHABLE;
+					return err;
+				} else if (err) {
 					return -EINVAL;
 				}
+
 				if (strlen(rsp_buf) > 0) {
 					char *ch = rsp_buf;
 
@@ -159,10 +167,18 @@ int handle_at_xcmng(enum at_cmd_type cmd_type)
 			slm_tls_tbl_dump();
 #else
 			enum at_cmd_state state;
+
 			err = at_cmd_write(cmd, rsp_buf, CONFIG_AT_CMD_RESPONSE_MAX_LEN, &state);
-			if (err) {
+			if (err == -EAGAIN) {
+				LOG_ERR("AT command timed out, indicating a modem issue");
+				slm_util_reboot(3);
+
+				CODE_UNREACHABLE;
+				return err;
+			} else if (err) {
 				return -EINVAL;
 			}
+
 			if (strlen(rsp_buf) > 0) {
 				char *ch = rsp_buf;
 

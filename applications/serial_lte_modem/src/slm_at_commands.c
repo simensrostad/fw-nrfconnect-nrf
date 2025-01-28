@@ -93,6 +93,8 @@ extern int slm_setting_uart_save(void);
 
 static void modem_power_off(void)
 {
+	int err;
+
 	/*
 	 * The LTE modem also needs to be stopped by issuing AT command
 	 * through the modem API, before entering System OFF mode.
@@ -102,7 +104,17 @@ static void modem_power_off(void)
 	 * Refer to https://infocenter.nordicsemi.com/topic/ps_nrf9160/
 	 * pmu.html?cp=2_0_0_4_0_0_1#system_off_mode
 	 */
-	(void)at_cmd_write("AT+CFUN=0", NULL, 0, NULL);
+	err = at_cmd_write("AT+CFUN=0", NULL, 0, NULL);
+	if (err == -EAGAIN) {
+		LOG_ERR("AT command timed out, indicating a modem issue");
+		slm_util_reboot(3);
+
+		CODE_UNREACHABLE;
+		return;
+	} else if (err) {
+		LOG_ERR("Failed to power off modem: %d", err);
+	}
+
 	k_sleep(K_SECONDS(1));
 }
 
@@ -218,7 +230,7 @@ static int handle_at_reset(enum at_cmd_type type)
 		k_sleep(K_MSEC(50));
 		slm_at_host_uninit();
 		modem_power_off();
-		sys_reboot(SYS_REBOOT_COLD);
+		slm_util_reboot(1);
 	}
 
 	return ret;

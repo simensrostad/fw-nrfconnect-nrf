@@ -7,8 +7,14 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <sys/reboot.h>
+#include <logging/log.h>
+#include <logging/log_ctrl.h>
+
 #include "slm_util.h"
 #include "slm_at_host.h"
+
+LOG_MODULE_REGISTER(slm_util, CONFIG_SLM_LOG_LEVEL);
 
 #define PRINTABLE_ASCII(ch) (ch > 0x1f && ch < 0x7f)
 
@@ -219,7 +225,13 @@ void util_get_ip_addr(char *addr4, char *addr6)
 	size_t addr_len;
 
 	err = at_cmd_write("AT+CGPADDR", rsp, sizeof(rsp), NULL);
-	if (err) {
+	if (err == -EAGAIN) {
+		LOG_ERR("AT command timed out, indicating a modem issue");
+		slm_util_reboot(3);
+
+		CODE_UNREACHABLE;
+		return;
+	} else if (err) {
 		return;
 	}
 	/** parse +CGPADDR: <cid>,<PDP_addr_1>,<PDP_addr_2>
@@ -314,4 +326,16 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
 	}
 
 	return 0;
+}
+
+void slm_util_reboot(uint32_t delay)
+{
+	LOG_WRN("Rebooting in %d seconds", delay);
+
+	LOG_PANIC();
+
+	/* Busy wait to allow for UART buffers to empty so that log is visible. */
+	k_busy_wait(USEC_PER_SEC * delay);
+
+	sys_reboot(SYS_REBOOT_COLD);
 }

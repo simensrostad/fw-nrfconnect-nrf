@@ -579,7 +579,13 @@ static void cmd_send(struct k_work *work)
 
 	/* Send to modem */
 	err = at_cmd_write(at_buf, at_buf, sizeof(at_buf), &state);
-	if (err < 0) {
+	if (err == -EAGAIN) {
+		LOG_ERR("AT command timed out, indicating a modem issue");
+		slm_util_reboot(3);
+
+		CODE_UNREACHABLE;
+		return;
+	} else if (err) {
 		LOG_ERR("AT command error: %d", err);
 		state = AT_CMD_ERROR;
 	}

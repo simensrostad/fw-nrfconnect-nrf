@@ -29,6 +29,7 @@
 #include "img_mgmt/img_mgmt.h"
 #include "slm_at_host.h"
 #include "slm_at_fota.h"
+#include "slm_util.h"
 
 LOG_MODULE_REGISTER(app, CONFIG_SLM_LOG_LEVEL);
 
@@ -148,7 +149,7 @@ void enter_dfu(void)
 	//nrf_modem_lib_shutdown();
 
 	nrf_power_gpregret_set(NRF_POWER_NS, SLM_DFU_STATUS);
-	sys_reboot(SYS_REBOOT_COLD);
+	slm_util_reboot(0);
 }
 
 void handle_nrf_modem_lib_init_ret(int ret)
@@ -187,8 +188,8 @@ void handle_nrf_modem_lib_init_ret(int ret)
 
 	slm_setting_fota_save();
 	LOG_WRN("Rebooting...");
-	LOG_PANIC();
-	sys_reboot(SYS_REBOOT_COLD);
+
+	slm_util_reboot(1);
 }
 
 void start_execute(void)

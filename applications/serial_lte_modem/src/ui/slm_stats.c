@@ -278,10 +278,17 @@ int slm_stats_read(void)
 
 	/* Read network registration status */
 	err = at_cmd_write(AT_CEREG_READ, buf, sizeof(buf), NULL);
-	if (err) {
+	if (err == -EAGAIN) {
+		LOG_ERR("AT command timed out, indicating a modem issue");
+		slm_util_reboot(3);
+
+		CODE_UNREACHABLE;
+		return err;
+	} else if (err) {
 		LOG_ERR("Could not get CEREG response, error: %d", err);
 		return err;
 	}
+
 	stats.reg_status = atoi(buf + strlen("+CEREG: 0,"));
 	if (stats.reg_status == LTE_LC_NW_REG_UICC_FAIL) {
 		LOG_ERR("Network registration fail: UICC");
@@ -342,11 +349,9 @@ static void stats_watchdog_callback(int channel_id, void *user_data)
 	ARG_UNUSED(channel_id);
 	ARG_UNUSED(user_data);
 
-	LOG_ERR("Stats thread watchdog triggered, rebooting in 3 seconds");
+	LOG_ERR("Stats thread watchdog triggered");
 
-	k_sleep(K_SECONDS(3));
-
-	sys_reboot(SYS_REBOOT_COLD);
+	slm_util_reboot(3);
 }
 
 static void stats_thread_fn(void *arg1, void *arg2, void *arg3)
