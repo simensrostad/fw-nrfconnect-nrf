@@ -63,6 +63,9 @@ int slm_setting_fota_save(void);
 void nrf_modem_recoverable_error_handler(uint32_t err)
 {
 	LOG_ERR("Modem library recoverable error: %u", err);
+
+	/* Recoverable modem library error, reboot to recover */
+	slm_util_reboot(1);
 }
 
 static void exit_idle(struct k_work *work)
