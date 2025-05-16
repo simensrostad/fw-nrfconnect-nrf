@@ -482,6 +482,7 @@ int nrf_provisioning_codec_process_commands(void)
 	struct cdc_in_fmt_data *ifd = CDC_IFMT_DATA_PTR(cctx);
 	struct cdc_out_fmt_data *ofd = CDC_OFMT_DATA_PTR(cctx);
 	enum lte_lc_func_mode orig;
+	enum lte_lc_func_mode func_mode;
 	int fpos = -1;
 	bool cmee_orig;
 
@@ -516,9 +517,17 @@ int nrf_provisioning_codec_process_commands(void)
 			fpos = i; /* Defer writing FINISHED until we know if we have errors */
 			break;
 		case command_union_at_command_m_c:
-			mret = mm.cb(LTE_LC_FUNC_MODE_OFFLINE, mm.user_data);
+
+			mret = lte_lc_func_mode_get(&func_mode);
 			if (mret < 0) {
 				goto stop_provisioning;
+			}
+
+			if (func_mode != LTE_LC_FUNC_MODE_OFFLINE) {
+				mret = mm.cb(LTE_LC_FUNC_MODE_OFFLINE, mm.user_data);
+				if (mret < 0) {
+					goto stop_provisioning;
+				}
 			}
 
 			ret = exec_at_cmd(CDC_IFMT_CMD_I_GET(cctx, i), cctx->o_data);

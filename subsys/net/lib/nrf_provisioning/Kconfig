@@ -18,6 +18,13 @@ config NRF_PROVISIONING_AUTO_INIT
 	help
 	  Initialize the client automatically after the modem library is initialized.
 
+config NRF_PROVISIONING_AUTO_START_ON_INIT
+	bool "Start provisioning automatically on initialization"
+	default y
+	help
+	  Start the client automatically after the client is initialized in the
+	  nrf_provisioning_init() function.
+
 config NRF_PROVISIONING_INTERVAL_S
 	int "Maximum provisioning interval in seconds"
 	default 86400

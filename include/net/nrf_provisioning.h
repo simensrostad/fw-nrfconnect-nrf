@@ -59,7 +59,15 @@ enum nrf_provisioning_event {
 	/** Provisioning process stopped. All provisioning commands (if any) executed. */
 	NRF_PROVISIONING_EVENT_STOP,
 	/** Provisioning complete. "Finished" command received from the provisioning service. */
-	NRF_PROVISIONING_EVENT_DONE
+	NRF_PROVISIONING_EVENT_DONE,
+	/** Provisioning process failed, try again. */
+	NRF_PROVISIONING_EVENT_FAILED,
+	/** Provisioning process failed, device not claimed. */
+	NRF_PROVISIONING_EVENT_FAILED_NOT_CLAIMED,
+	/** Provisioning process failed, wrong CA certificate. */
+	NRF_PROVISIONING_EVENT_FAILED_WRONG_CA,
+	/** Error occurred during provisioning. */
+	NRF_PROVISIONING_EVENT_ERROR
 };
 
 /**

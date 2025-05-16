@@ -384,12 +384,6 @@ int nrf_provisioning_init(struct nrf_provisioning_mm_change *mmode,
 		goto exit;
 	}
 
-	/* Provision certificates now when it's possible to put modem offline */
-	ret = cert_provision();
-	if (ret) {
-		goto exit;
-	}
-
 	ret = settings_init();
 	if (ret == -EALREADY) {
 		ret = 0;
@@ -402,8 +396,10 @@ int nrf_provisioning_init(struct nrf_provisioning_mm_change *mmode,
 
 	lte_lc_register_handler(nrf_provisioning_lte_handler);
 
-	/* Let the provisioning thread run */
-	k_condvar_signal(&np_cond);
+	if (IS_ENABLED(CONFIG_NRF_PROVISIONING_AUTO_START_ON_INIT)) {
+		/* Let the provisioning thread run */
+		k_condvar_signal(&np_cond);
+	}
 exit:
 	k_mutex_unlock(&np_mtx);
 
@@ -563,6 +559,13 @@ int nrf_provisioning_req(void)
 	k_condvar_wait(&np_cond, &np_mtx, K_FOREVER);
 	k_mutex_unlock(&np_mtx);
 
+	ret = cert_provision();
+	if (ret) {
+		LOG_ERR("Failed to provision certificate, err %d", ret);
+		dm.cb(NRF_PROVISIONING_EVENT_ERROR, dm.user_data);
+		return ret;
+	}
+
 	while (true) {
 		backoff = CONFIG_NRF_PROVISIONING_INITIAL_BACKOFF; /* Backoff start interval */
 		settings_load_subtree(settings.name); /* Get the provisioning interval */
@@ -628,17 +631,22 @@ int nrf_provisioning_req(void)
 					modem_attest_token_free(&token);
 				}
 			}
+
+			dm.cb(NRF_PROVISIONING_EVENT_FAILED_NOT_CLAIMED, dm.user_data);
 		}
 
 		if (ret == -EINVAL) {
 			__ASSERT(false, "Invalid exchange, abort");
 			LOG_ERR("Invalid exchange");
+			dm.cb(NRF_PROVISIONING_EVENT_FAILED, dm.user_data);
 		} else if (ret == -ECONNREFUSED) {
 			LOG_ERR("Connection refused");
 			LOG_WRN("Please check the CA certificate stored in sectag "
 				STRINGIFY(CONFIG_NRF_PROVISIONING_ROOT_CA_SEC_TAG)"");
+			dm.cb(NRF_PROVISIONING_EVENT_FAILED_WRONG_CA, dm.user_data);
 		} else if (ret < 0) {
 			LOG_ERR("Provisioning failed, error: %d", ret);
+			dm.cb(NRF_PROVISIONING_EVENT_FAILED, dm.user_data);
 		} else if (ret > 0) {
 			/* Provisioning finished */
 			if (IS_ENABLED(CONFIG_NRF_PROVISIONING_SAVE_CMD_ID)) {
