@@ -73,7 +73,7 @@ int nrf_modem_lib_trace_level_set(enum nrf_modem_lib_trace_level trace_level);
  *
  * @returns Number of bytes stored in the trace backend.
  */
-size_t nrf_modem_lib_trace_data_size(void);
+int nrf_modem_lib_trace_data_size(void);
 
 /**
  * @brief Read trace data

@@ -483,7 +483,7 @@ int nrf_modem_lib_trace_level_set(enum nrf_modem_lib_trace_level trace_level)
 	return 0;
 }
 
-size_t nrf_modem_lib_trace_data_size(void)
+int nrf_modem_lib_trace_data_size(void)
 {
 	if (!trace_backend.data_size) {
 		return -ENOTSUP;
